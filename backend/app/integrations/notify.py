@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -9,6 +10,8 @@ from app.integrations.openclaw import OpenClawClient
 from app.models.org import Employee
 from app.models.projects import ProjectMember
 from app.models.work import Task, TaskComment
+
+logger = logging.getLogger("app.notify")
 
 
 @dataclass(frozen=True)
@@ -143,15 +146,36 @@ def build_message(ctx: NotifyContext, recipient: Employee) -> str:
 
 def notify_openclaw(session: Session, ctx: NotifyContext) -> None:
     client = OpenClawClient.from_env()
+    logger.info(
+        "notify_openclaw: start",
+        extra={
+            "event": ctx.event,
+            "task_id": getattr(ctx.task, "id", None),
+            "actor": ctx.actor_employee_id,
+        },
+    )
     if client is None:
+        logger.warning("notify_openclaw: skipped (missing OpenClaw env)")
         return
 
     recipient_ids = resolve_recipients(session, ctx)
+    logger.info(
+        "notify_openclaw: recipients resolved", extra={"recipient_ids": sorted(recipient_ids)}
+    )
     recipients = _employees_with_session_keys(session, recipient_ids)
     if not recipients:
+        logger.info("notify_openclaw: no recipients with session keys")
         return
 
     for e in recipients:
+        logger.info(
+            "notify_openclaw: sending",
+            extra={
+                "to_employee_id": getattr(e, "id", None),
+                "session_key": getattr(e, "openclaw_session_key", None),
+                "event": ctx.event,
+            },
+        )
         sk = getattr(e, "openclaw_session_key", None)
         if not sk:
             continue
@@ -164,5 +188,6 @@ def notify_openclaw(session: Session, ctx: NotifyContext) -> None:
                 timeout_s=3.0,
             )
         except Exception:
+            logger.exception("notify_openclaw: sessions_send failed")
             # best-effort; never break Mission Control writes
             continue

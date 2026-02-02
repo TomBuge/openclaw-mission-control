@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 import requests
+
+logger = logging.getLogger("app.openclaw")
 
 
 class OpenClawClient:
@@ -28,6 +31,9 @@ class OpenClawClient:
         timeout_s: float = 5.0,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"tool": tool, "args": args}
+        logger.info(
+            "openclaw.tools_invoke", extra={"tool": tool, "has_session_key": bool(session_key)}
+        )
         if session_key is not None:
             payload["sessionKey"] = session_key
 
@@ -38,4 +44,5 @@ class OpenClawClient:
             timeout=timeout_s,
         )
         r.raise_for_status()
+        logger.info("openclaw.tools_invoke: ok", extra={"tool": tool, "status": r.status_code})
         return r.json()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -13,6 +14,8 @@ from app.integrations.openclaw import OpenClawClient
 from app.models.org import Employee
 from app.models.work import Task, TaskComment
 from app.schemas.work import TaskCommentCreate, TaskCreate, TaskUpdate
+
+logger = logging.getLogger("app.work")
 
 router = APIRouter(tags=["work"])
 
@@ -110,16 +113,27 @@ def dispatch_task(
     session: Session = Depends(get_session),
     actor_employee_id: int = Depends(get_actor_employee_id),
 ):
+    logger.info("dispatch_task: called", extra={"task_id": task_id, "actor": actor_employee_id})
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    logger.info(
+        "dispatch_task: loaded",
+        extra={
+            "task_id": getattr(task, "id", None),
+            "assignee_employee_id": getattr(task, "assignee_employee_id", None),
+        },
+    )
 
     if task.assignee_employee_id is None:
         raise HTTPException(status_code=400, detail="Task has no assignee")
 
     _validate_task_assignee(session, task.assignee_employee_id)
 
-    if OpenClawClient.from_env() is None:
+    client = OpenClawClient.from_env()
+    if client is None:
+        logger.warning("dispatch_task: missing OpenClaw env")
         raise HTTPException(
             status_code=503,
             detail="OpenClaw gateway is not configured (set OPENCLAW_GATEWAY_URL/TOKEN)",
@@ -143,6 +157,7 @@ def update_task(
     session: Session = Depends(get_session),
     actor_employee_id: int = Depends(get_actor_employee_id),
 ):
+    logger.info("dispatch_task: called", extra={"task_id": task_id, "actor": actor_employee_id})
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -242,6 +257,7 @@ def delete_task(
     session: Session = Depends(get_session),
     actor_employee_id: int = Depends(get_actor_employee_id),
 ):
+    logger.info("dispatch_task: called", extra={"task_id": task_id, "actor": actor_employee_id})
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

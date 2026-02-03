@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.activities import router as activities_router
-from app.api.org import router as org_router
-from app.api.projects import router as projects_router
-from app.api.work import router as work_router
+from app.api.activity import router as activity_router
+from app.api.agents import router as agents_router
+from app.api.auth import router as auth_router
+from app.api.boards import router as boards_router
+from app.api.gateway import router as gateway_router
+from app.api.tasks import router as tasks_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.session import init_db
 
 configure_logging()
 
-app = FastAPI(title="OpenClaw Agency API", version="0.3.0")
+app = FastAPI(title="Mission Control API", version="0.1.0")
 
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 if origins:
@@ -31,12 +33,16 @@ def on_startup() -> None:
     init_db()
 
 
-app.include_router(org_router)
-app.include_router(projects_router)
-app.include_router(work_router)
-app.include_router(activities_router)
-
-
 @app.get("/health")
-def health():
+def health() -> dict[str, bool]:
     return {"ok": True}
+
+
+api_v1 = APIRouter(prefix="/api/v1")
+api_v1.include_router(auth_router)
+api_v1.include_router(agents_router)
+api_v1.include_router(activity_router)
+api_v1.include_router(gateway_router)
+api_v1.include_router(boards_router)
+api_v1.include_router(tasks_router)
+app.include_router(api_v1)

@@ -1,23 +1,38 @@
-import type { Metadata } from "next";
 import "./globals.css";
-import { Providers } from "./providers";
-import { Shell } from "./_components/Shell";
+
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+
+import { ClerkProvider } from "@clerk/nextjs";
+import { Inter, Space_Grotesk } from "next/font/google";
 
 export const metadata: Metadata = {
-  title: "OpenClaw Agency — Mission Control",
-  description: "Company OS for projects, departments, people, and HR.",
+  title: "OpenClaw Mission Control",
+  description: "A calm command center for every task.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+const bodyFont = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-body",
+});
+
+const headingFont = Space_Grotesk({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-heading",
+});
+
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <Shell><Providers>{children}</Providers></Shell>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body
+          className={`${bodyFont.variable} ${headingFont.variable} min-h-screen bg-white text-gray-900 antialiased`}
+        >
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

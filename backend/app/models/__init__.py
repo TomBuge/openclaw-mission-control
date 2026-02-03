@@ -1,15 +1,13 @@
-from app.models.activity import Activity
-from app.models.org import Department, Employee, Team
-from app.models.projects import Project, ProjectMember
-from app.models.work import Task, TaskComment
+from app.models.activity_events import ActivityEvent
+from app.models.agents import Agent
+from app.models.boards import Board
+from app.models.tasks import Task
+from app.models.users import User
 
 __all__ = [
-    "Department",
-    "Employee",
-    "Team",
-    "Project",
-    "ProjectMember",
+    "ActivityEvent",
+    "Agent",
+    "Board",
     "Task",
-    "TaskComment",
-    "Activity",
+    "User",
 ]

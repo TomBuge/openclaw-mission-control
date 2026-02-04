@@ -203,6 +203,7 @@ export default function EditGatewayPage() {
       }
       const updated = (await response.json()) as Gateway;
       setGateway(updated);
+      router.push(`/gateways/${updated.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {

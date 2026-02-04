@@ -119,14 +119,17 @@ export default function GatewaysPage() {
         accessorKey: "name",
         header: "Gateway",
         cell: ({ row }) => (
-          <div>
-            <p className="text-sm font-medium text-slate-900">
+          <Link
+            href={`/gateways/${row.original.id}`}
+            className="group block"
+          >
+            <p className="text-sm font-medium text-slate-900 group-hover:text-blue-600">
               {row.original.name}
             </p>
             <p className="text-xs text-slate-500">
               {truncate(row.original.url, 36)}
             </p>
-          </div>
+          </Link>
         ),
       },
       {

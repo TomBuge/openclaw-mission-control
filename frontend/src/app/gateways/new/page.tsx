@@ -161,7 +161,7 @@ export default function NewGatewayPage() {
         throw new Error("Unable to create gateway.");
       }
       const created = (await response.json()) as { id: string };
-      router.push(`/gateways/${created.id}/edit`);
+      router.push(`/gateways/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {

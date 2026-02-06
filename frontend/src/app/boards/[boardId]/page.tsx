@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 
 import { SignInButton, SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
 import { Activity, MessageSquare, Pencil, Settings, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
 import { TaskBoard } from "@/components/organisms/TaskBoard";
@@ -120,6 +121,41 @@ const EMOJI_GLYPHS: Record<string, string> = {
   ":shield:": "🛡️",
   ":memo:": "📝",
   ":brain:": "🧠",
+};
+
+const MARKDOWN_TABLE_COMPONENTS: Components = {
+  table: ({ node: _node, className, ...props }) => (
+    <div className="my-3 overflow-x-auto">
+      <table
+        className={cn("w-full border-collapse", className)}
+        {...props}
+      />
+    </div>
+  ),
+  thead: ({ node: _node, className, ...props }) => (
+    <thead className={cn("bg-slate-50", className)} {...props} />
+  ),
+  tbody: ({ node: _node, className, ...props }) => (
+    <tbody className={cn("divide-y divide-slate-100", className)} {...props} />
+  ),
+  tr: ({ node: _node, className, ...props }) => (
+    <tr className={cn("align-top", className)} {...props} />
+  ),
+  th: ({ node: _node, className, ...props }) => (
+    <th
+      className={cn(
+        "border border-slate-200 px-3 py-2 text-left text-xs font-semibold",
+        className,
+      )}
+      {...props}
+    />
+  ),
+  td: ({ node: _node, className, ...props }) => (
+    <td
+      className={cn("border border-slate-200 px-3 py-2 align-top", className)}
+      {...props}
+    />
+  ),
 };
 
 export default function BoardDetailPage() {
@@ -1650,35 +1686,37 @@ export default function BoardDetailPage() {
               {selectedTask?.description ? (
                 <div className="prose prose-sm max-w-none text-slate-700">
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
-                      p: ({ ...props }) => (
+                      ...MARKDOWN_TABLE_COMPONENTS,
+                      p: ({ node: _node, ...props }) => (
                         <p className="mb-3 last:mb-0" {...props} />
                       ),
-                      ul: ({ ...props }) => (
+                      ul: ({ node: _node, ...props }) => (
                         <ul className="mb-3 list-disc pl-5" {...props} />
                       ),
-                      ol: ({ ...props }) => (
+                      ol: ({ node: _node, ...props }) => (
                         <ol className="mb-3 list-decimal pl-5" {...props} />
                       ),
-                      li: ({ ...props }) => (
+                      li: ({ node: _node, ...props }) => (
                         <li className="mb-1" {...props} />
                       ),
-                      strong: ({ ...props }) => (
+                      strong: ({ node: _node, ...props }) => (
                         <strong className="font-semibold" {...props} />
                       ),
-                      h1: ({ ...props }) => (
+                      h1: ({ node: _node, ...props }) => (
                         <h1 className="mb-2 text-base font-semibold" {...props} />
                       ),
-                      h2: ({ ...props }) => (
+                      h2: ({ node: _node, ...props }) => (
                         <h2 className="mb-2 text-sm font-semibold" {...props} />
                       ),
-                      h3: ({ ...props }) => (
+                      h3: ({ node: _node, ...props }) => (
                         <h3 className="mb-2 text-sm font-semibold" {...props} />
                       ),
-                      code: ({ ...props }) => (
+                      code: ({ node: _node, ...props }) => (
                         <code className="rounded bg-slate-100 px-1 py-0.5 text-xs" {...props} />
                       ),
-                      pre: ({ ...props }) => (
+                      pre: ({ node: _node, ...props }) => (
                         <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100" {...props} />
                       ),
                     }}
@@ -1835,26 +1873,28 @@ export default function BoardDetailPage() {
                       {comment.message?.trim() ? (
                         <div className="mt-2 text-sm text-slate-900 whitespace-pre-wrap break-words">
                           <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
                             components={{
-                              p: ({ ...props }) => (
+                              ...MARKDOWN_TABLE_COMPONENTS,
+                              p: ({ node: _node, ...props }) => (
                                 <p
                                   className="text-sm text-slate-900 whitespace-pre-wrap break-words"
                                   {...props}
                                 />
                               ),
-                              ul: ({ ...props }) => (
+                              ul: ({ node: _node, ...props }) => (
                                 <ul
                                   className="list-disc pl-5 text-sm text-slate-900 whitespace-pre-wrap break-words"
                                   {...props}
                                 />
                               ),
-                              li: ({ ...props }) => (
+                              li: ({ node: _node, ...props }) => (
                                 <li
                                   className="mb-1 text-sm text-slate-900 whitespace-pre-wrap break-words"
                                   {...props}
                                 />
                               ),
-                              strong: ({ ...props }) => (
+                              strong: ({ node: _node, ...props }) => (
                                 <strong
                                   className="font-semibold text-slate-900"
                                   {...props}
@@ -1930,17 +1970,19 @@ export default function BoardDetailPage() {
                     </div>
                     <div className="mt-2 text-sm text-slate-900">
                       <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
                         components={{
-                          p: ({ ...props }) => (
+                          ...MARKDOWN_TABLE_COMPONENTS,
+                          p: ({ node: _node, ...props }) => (
                             <p className="mb-2 last:mb-0" {...props} />
                           ),
-                          ul: ({ ...props }) => (
+                          ul: ({ node: _node, ...props }) => (
                             <ul className="mb-2 list-disc pl-5" {...props} />
                           ),
-                          ol: ({ ...props }) => (
+                          ol: ({ node: _node, ...props }) => (
                             <ol className="mb-2 list-decimal pl-5" {...props} />
                           ),
-                          strong: ({ ...props }) => (
+                          strong: ({ node: _node, ...props }) => (
                             <strong className="font-semibold" {...props} />
                           ),
                         }}
@@ -2039,20 +2081,22 @@ export default function BoardDetailPage() {
                     {comment.message?.trim() ? (
                       <div className="mt-2 text-xs text-slate-900">
                         <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
                           components={{
-                            p: ({ ...props }) => (
+                            ...MARKDOWN_TABLE_COMPONENTS,
+                            p: ({ node: _node, ...props }) => (
                               <p className="mb-2 last:mb-0" {...props} />
                             ),
-                            ul: ({ ...props }) => (
+                            ul: ({ node: _node, ...props }) => (
                               <ul className="mb-2 list-disc pl-5" {...props} />
                             ),
-                            ol: ({ ...props }) => (
+                            ol: ({ node: _node, ...props }) => (
                               <ol className="mb-2 list-decimal pl-5" {...props} />
                             ),
-                            li: ({ ...props }) => (
+                            li: ({ node: _node, ...props }) => (
                               <li className="mb-1" {...props} />
                             ),
-                            strong: ({ ...props }) => (
+                            strong: ({ node: _node, ...props }) => (
                               <strong className="font-semibold" {...props} />
                             ),
                           }}

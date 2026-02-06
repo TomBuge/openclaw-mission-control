@@ -19,7 +19,6 @@ async def run() -> None:
             token=None,
             main_session_key="demo:main",
             workspace_root="/tmp/openclaw-demo",
-            skyll_enabled=False,
         )
         session.add(gateway)
         await session.commit()

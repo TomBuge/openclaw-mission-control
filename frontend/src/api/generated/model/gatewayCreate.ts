@@ -8,7 +8,6 @@
 export interface GatewayCreate {
   main_session_key: string;
   name: string;
-  skyll_enabled?: boolean;
   token?: string | null;
   url: string;
   workspace_root: string;

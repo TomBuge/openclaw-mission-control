@@ -47,7 +47,6 @@ export default function NewGatewayPage() {
     DEFAULT_MAIN_SESSION_KEY
   );
   const [workspaceRoot, setWorkspaceRoot] = useState(DEFAULT_WORKSPACE_ROOT);
-  const [skyllEnabled, setSkyllEnabled] = useState(false);
 
   const [gatewayUrlError, setGatewayUrlError] = useState<string | null>(null);
   const [gatewayCheckStatus, setGatewayCheckStatus] = useState<
@@ -157,7 +156,6 @@ export default function NewGatewayPage() {
         token: gatewayToken.trim() || null,
         main_session_key: mainSessionKey.trim(),
         workspace_root: workspaceRoot.trim(),
-        skyll_enabled: skyllEnabled,
       },
     });
   };
@@ -193,48 +191,16 @@ export default function NewGatewayPage() {
               onSubmit={handleSubmit}
               className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
             >
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-900">
-                    Gateway name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Primary gateway"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-900">
-                    Install Skyll
-                    <a
-                      href="https://www.skyll.app"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                    >
-                      skyll.app
-                    </a>
-                  </label>
-                  <div className="flex h-11 items-center justify-end rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 shadow-sm">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={skyllEnabled}
-                      onClick={() => setSkyllEnabled((prev) => !prev)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                        skyllEnabled ? "bg-blue-600" : "bg-slate-200"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                          skyllEnabled ? "translate-x-5" : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900">
+                  Gateway name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Primary gateway"
+                  disabled={isLoading}
+                />
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">

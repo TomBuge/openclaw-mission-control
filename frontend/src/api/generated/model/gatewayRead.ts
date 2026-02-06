@@ -10,7 +10,6 @@ export interface GatewayRead {
   id: string;
   main_session_key: string;
   name: string;
-  skyll_enabled?: boolean;
   token?: string | null;
   updated_at: string;
   url: string;

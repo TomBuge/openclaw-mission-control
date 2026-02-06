@@ -167,15 +167,6 @@ export default function GatewaysPage() {
         ),
       },
       {
-        accessorKey: "skyll_enabled",
-        header: "Skyll",
-        cell: ({ row }) => (
-          <span className="text-sm text-slate-700">
-            {row.original.skyll_enabled ? "Enabled" : "Off"}
-          </span>
-        ),
-      },
-      {
         accessorKey: "updated_at",
         header: "Updated",
         cell: ({ row }) => (

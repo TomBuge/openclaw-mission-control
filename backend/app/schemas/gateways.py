@@ -13,7 +13,6 @@ class GatewayBase(SQLModel):
     url: str
     main_session_key: str
     workspace_root: str
-    skyll_enabled: bool = False
 
 
 class GatewayCreate(GatewayBase):
@@ -36,7 +35,6 @@ class GatewayUpdate(SQLModel):
     token: str | None = None
     main_session_key: str | None = None
     workspace_root: str | None = None
-    skyll_enabled: bool | None = None
 
     @field_validator("token", mode="before")
     @classmethod

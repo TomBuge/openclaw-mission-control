@@ -17,6 +17,5 @@ class Gateway(SQLModel, table=True):
     token: str | None = Field(default=None)
     main_session_key: str
     workspace_root: str
-    skyll_enabled: bool = Field(default=False)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

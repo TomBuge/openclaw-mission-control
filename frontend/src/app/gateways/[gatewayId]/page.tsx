@@ -193,12 +193,6 @@ export default function GatewayDetailPage() {
                           {maskToken(gateway.token)}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase text-slate-400">Skyll</p>
-                        <p className="mt-1 text-sm font-medium text-slate-900">
-                          {gateway.skyll_enabled ? "Enabled" : "Not installed"}
-                        </p>
-                      </div>
                     </div>
                   </div>
 

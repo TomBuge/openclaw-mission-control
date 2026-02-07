@@ -4,7 +4,6 @@ describe("/activity feed", () => {
   const apiBase = "**/api/v1";
 
   function stubStreamEmpty() {
-    // Return a minimal SSE response that ends immediately.
     cy.intercept(
       "GET",
       `${apiBase}/activity/task-comments/stream*`,
@@ -18,11 +17,55 @@ describe("/activity feed", () => {
     ).as("activityStream");
   }
 
-  function isSignedOutView(): Cypress.Chainable<boolean> {
-    return cy
-      .get("body")
-      .then(($body) => $body.text().toLowerCase().includes("sign in to view the feed"));
+  function signInWithClerk({ otp }: { otp: string }) {
+    cy.contains(/sign in to view the feed/i).should("be.visible");
+    cy.get('[data-testid="activity-signin"]').click();
+
+    // Redirect mode should bring us to a full-page Clerk sign-in experience.
+    cy.get('input[type="email"], input[name="identifier"]', { timeout: 20_000 })
+      .first()
+      .should("be.visible")
+      .clear()
+      .type("jane+clerk_test@example.com");
+
+    cy.contains('button', /continue|sign in/i).click();
+
+    cy.get('input', { timeout: 20_000 })
+      .filter('[inputmode="numeric"], [autocomplete="one-time-code"], [type="tel"], [name="code"], [type="text"]')
+      .first()
+      .should("be.visible")
+      .type(otp);
+
+    cy.contains('button', /verify|continue|sign in/i).click();
+
+    // Back to app
+    cy.contains(/live feed/i, { timeout: 30_000 }).should("be.visible");
   }
+
+  it("auth negative: wrong OTP shows an error", () => {
+    cy.visit("/activity");
+
+    cy.contains(/sign in to view the feed/i).should("be.visible");
+    cy.get('[data-testid="activity-signin"]').click();
+
+    cy.get('input[type="email"], input[name="identifier"]', { timeout: 20_000 })
+      .first()
+      .should("be.visible")
+      .clear()
+      .type("jane+clerk_test@example.com");
+
+    cy.contains('button', /continue|sign in/i).click();
+
+    cy.get('input', { timeout: 20_000 })
+      .filter('[inputmode="numeric"], [autocomplete="one-time-code"], [type="tel"], [name="code"], [type="text"]')
+      .first()
+      .should("be.visible")
+      .type("000000");
+
+    cy.contains('button', /verify|continue|sign in/i).click();
+
+    cy.contains(/invalid|incorrect|try again/i, { timeout: 20_000 }).should("be.visible");
+  });
 
   it("happy path: renders task comment cards", () => {
     cy.intercept("GET", `${apiBase}/activity/task-comments*`, {
@@ -40,43 +83,18 @@ describe("/activity feed", () => {
             task_title: "CI hardening",
             created_at: "2026-02-07T00:00:00Z",
           },
-          {
-            id: "c2",
-            message: "Second comment",
-            agent_name: "Riya",
-            agent_role: "QA",
-            board_id: "b1",
-            board_name: "Testing",
-            task_id: "t2",
-            task_title: "Coverage policy",
-            created_at: "2026-02-07T00:01:00Z",
-          },
         ],
       },
     }).as("activityList");
 
     stubStreamEmpty();
 
-    cy.visit("/activity", {
-      onBeforeLoad(win: Window) {
-        win.localStorage.clear();
-      },
-    });
+    cy.visit("/activity");
+    signInWithClerk({ otp: "424242" });
 
-    isSignedOutView().then((signedOut) => {
-      if (signedOut) {
-        // In secretless CI (no Clerk), the SignedOut UI is expected and no API calls should happen.
-        cy.contains(/sign in to view the feed/i).should("be.visible");
-        return;
-      }
-
-      cy.wait("@activityList");
-
-      cy.contains(/live feed/i).should("be.visible");
-      cy.contains("CI hardening").should("be.visible");
-      cy.contains("Coverage policy").should("be.visible");
-      cy.contains("Hello world").should("be.visible");
-    });
+    cy.wait("@activityList");
+    cy.contains("CI hardening").should("be.visible");
+    cy.contains("Hello world").should("be.visible");
   });
 
   it("empty state: shows waiting message when no items", () => {
@@ -88,16 +106,10 @@ describe("/activity feed", () => {
     stubStreamEmpty();
 
     cy.visit("/activity");
+    signInWithClerk({ otp: "424242" });
 
-    isSignedOutView().then((signedOut) => {
-      if (signedOut) {
-        cy.contains(/sign in to view the feed/i).should("be.visible");
-        return;
-      }
-
-      cy.wait("@activityList");
-      cy.contains(/waiting for new comments/i).should("be.visible");
-    });
+    cy.wait("@activityList");
+    cy.contains(/waiting for new comments/i).should("be.visible");
   });
 
   it("error state: shows failure UI when API errors", () => {
@@ -109,17 +121,9 @@ describe("/activity feed", () => {
     stubStreamEmpty();
 
     cy.visit("/activity");
+    signInWithClerk({ otp: "424242" });
 
-    isSignedOutView().then((signedOut) => {
-      if (signedOut) {
-        cy.contains(/sign in to view the feed/i).should("be.visible");
-        return;
-      }
-
-      cy.wait("@activityList");
-
-      // UI uses query.error.message or fallback.
-      cy.contains(/unable to load feed|boom/i).should("be.visible");
-    });
+    cy.wait("@activityList");
+    cy.contains(/unable to load feed|boom/i).should("be.visible");
   });
 });

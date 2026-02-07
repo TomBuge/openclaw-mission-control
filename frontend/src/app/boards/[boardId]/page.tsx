@@ -44,6 +44,7 @@ import {
   streamApprovalsApiV1BoardsBoardIdApprovalsStreamGet,
   updateApprovalApiV1BoardsBoardIdApprovalsApprovalIdPatch,
 } from "@/api/generated/approvals/approvals";
+import { listTaskCommentFeedApiV1ActivityTaskCommentsGet } from "@/api/generated/activity/activity";
 import { getBoardSnapshotApiV1BoardsBoardIdSnapshotGet } from "@/api/generated/boards/boards";
 import {
   createBoardMemoryApiV1BoardsBoardIdMemoryPost,
@@ -307,6 +308,12 @@ export default function BoardDetailPage() {
   const openedTaskIdFromUrlRef = useRef<string | null>(null);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [liveFeed, setLiveFeed] = useState<TaskComment[]>([]);
+  const [isLiveFeedHistoryLoading, setIsLiveFeedHistoryLoading] =
+    useState(false);
+  const [liveFeedHistoryError, setLiveFeedHistoryError] = useState<
+    string | null
+  >(null);
+  const liveFeedHistoryLoadedRef = useRef(false);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
@@ -344,6 +351,71 @@ export default function BoardDetailPage() {
       return next.slice(0, 50);
     });
   }, []);
+
+  useEffect(() => {
+    liveFeedHistoryLoadedRef.current = false;
+    setIsLiveFeedHistoryLoading(false);
+    setLiveFeedHistoryError(null);
+    setLiveFeed([]);
+  }, [boardId]);
+
+  useEffect(() => {
+    if (!isLiveFeedOpen) return;
+    if (!isSignedIn || !boardId) return;
+    if (liveFeedHistoryLoadedRef.current) return;
+
+    let cancelled = false;
+    setIsLiveFeedHistoryLoading(true);
+    setLiveFeedHistoryError(null);
+
+    const fetchHistory = async () => {
+      try {
+        const result = await listTaskCommentFeedApiV1ActivityTaskCommentsGet({
+          board_id: boardId,
+          limit: 200,
+        });
+        if (cancelled) return;
+        if (result.status !== 200) {
+          throw new Error("Unable to load live feed.");
+        }
+        const items = result.data.items ?? [];
+        liveFeedHistoryLoadedRef.current = true;
+
+        const mapped: TaskComment[] = items.map((item) => ({
+          id: item.id,
+          message: item.message ?? null,
+          agent_id: item.agent_id ?? null,
+          task_id: item.task_id ?? null,
+          created_at: item.created_at,
+        }));
+
+        setLiveFeed((prev) => {
+          const map = new Map<string, TaskComment>();
+          [...prev, ...mapped].forEach((item) => map.set(item.id, item));
+          const merged = [...map.values()];
+          merged.sort((a, b) => {
+            const aTime = apiDatetimeToMs(a.created_at) ?? 0;
+            const bTime = apiDatetimeToMs(b.created_at) ?? 0;
+            return bTime - aTime;
+          });
+          return merged.slice(0, 50);
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setLiveFeedHistoryError(
+          err instanceof Error ? err.message : "Unable to load live feed.",
+        );
+      } finally {
+        if (cancelled) return;
+        setIsLiveFeedHistoryLoading(false);
+      }
+    };
+
+    void fetchHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardId, isLiveFeedOpen, isSignedIn]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -2365,7 +2437,13 @@ export default function BoardDetailPage() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-4">
-            {orderedLiveFeed.length === 0 ? (
+            {isLiveFeedHistoryLoading && orderedLiveFeed.length === 0 ? (
+              <p className="text-sm text-slate-500">Loading feed…</p>
+            ) : liveFeedHistoryError ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
+                {liveFeedHistoryError}
+              </div>
+            ) : orderedLiveFeed.length === 0 ? (
               <p className="text-sm text-slate-500">
                 Waiting for new comments…
               </p>

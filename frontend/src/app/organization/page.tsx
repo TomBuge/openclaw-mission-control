@@ -378,7 +378,9 @@ export default function OrganizationPage() {
   });
 
   const membershipRole =
-    membershipQuery.data?.status === 200 ? membershipQuery.data.data.role : null;
+    membershipQuery.data?.status === 200
+      ? membershipQuery.data.data.role
+      : null;
   const isOwner = membershipRole === "owner";
   const isAdmin = membershipRole === "admin" || membershipRole === "owner";
 
@@ -842,7 +844,9 @@ export default function OrganizationPage() {
                     onClick={() => setInviteDialogOpen(true)}
                     disabled={!isAdmin}
                     title={
-                      isAdmin ? undefined : "Only organization admins can invite"
+                      isAdmin
+                        ? undefined
+                        : "Only organization admins can invite"
                     }
                   >
                     <UserPlus className="h-4 w-4" />

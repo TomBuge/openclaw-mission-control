@@ -31,7 +31,10 @@ import type { BoardGroupRead, BoardRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
-import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
+import {
+  TableEmptyStateRow,
+  TableLoadingRow,
+} from "@/components/ui/table-state";
 
 const compactId = (value: string) =>
   value.length > 8 ? `${value.slice(0, 8)}…` : value;
@@ -312,7 +315,9 @@ export default function BoardsPage() {
         </div>
 
         {boardsQuery.error ? (
-          <p className="mt-4 text-sm text-red-500">{boardsQuery.error.message}</p>
+          <p className="mt-4 text-sm text-red-500">
+            {boardsQuery.error.message}
+          </p>
         ) : null}
       </DashboardPageLayout>
       <ConfirmActionDialog
@@ -326,8 +331,7 @@ export default function BoardsPage() {
         title="Delete board"
         description={
           <>
-            This will remove {deleteTarget?.name}. This action cannot be
-            undone.
+            This will remove {deleteTarget?.name}. This action cannot be undone.
           </>
         }
         errorMessage={deleteMutation.error?.message}

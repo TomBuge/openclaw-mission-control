@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-
 import { ActivityFeed } from "./ActivityFeed";
 
 type Item = { id: string; label: string };
@@ -56,9 +55,7 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    expect(
-      screen.getByText("Waiting for new comments…"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Waiting for new comments…")).toBeInTheDocument();
     expect(
       screen.getByText("When agents post updates, they will show up here."),
     ).toBeInTheDocument();

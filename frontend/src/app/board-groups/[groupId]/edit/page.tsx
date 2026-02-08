@@ -290,166 +290,164 @@ export default function EditBoardGroupPage() {
         onSubmit={handleSubmit}
         className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
       >
-              {assignFailedCount && Number.isFinite(assignFailedCount) ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
-                  Group was created, but {assignFailedCount} board assignment
-                  {assignFailedCount === 1 ? "" : "s"} failed. You can retry
-                  below.
-                </div>
-              ) : null}
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-900">
-                    Group name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    value={resolvedName}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Group name"
-                    disabled={isLoading || !baseGroup}
-                  />
-                </div>
+        {assignFailedCount && Number.isFinite(assignFailedCount) ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
+            Group was created, but {assignFailedCount} board assignment
+            {assignFailedCount === 1 ? "" : "s"} failed. You can retry below.
+          </div>
+        ) : null}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-900">
+              Group name <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={resolvedName}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Group name"
+              disabled={isLoading || !baseGroup}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-900">
+            Description
+          </label>
+          <Textarea
+            value={resolvedDescription}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="What ties these boards together?"
+            className="min-h-[120px]"
+            disabled={isLoading || !baseGroup}
+          />
+        </div>
+
+        <div className="space-y-2 border-t border-slate-100 pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Boards</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Assign boards to this group to share context across related
+                work.
+              </p>
+            </div>
+            <span className="text-xs text-slate-500">
+              {selectedBoardIds.size} selected
+            </span>
+          </div>
+
+          <Input
+            value={boardSearch}
+            onChange={(event) => setBoardSearch(event.target.value)}
+            placeholder="Search boards..."
+            disabled={isLoading || !baseGroup}
+          />
+
+          <div className="max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50/40">
+            {boardsLoading && boards.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-slate-500">
+                Loading boards…
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-900">
-                  Description
-                </label>
-                <Textarea
-                  value={resolvedDescription}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="What ties these boards together?"
-                  className="min-h-[120px]"
-                  disabled={isLoading || !baseGroup}
-                />
+            ) : boardsError ? (
+              <div className="px-4 py-6 text-sm text-rose-700">
+                {boardsError.message}
               </div>
-
-              <div className="space-y-2 border-t border-slate-100 pt-6">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">Boards</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Assign boards to this group to share context across
-                      related work.
-                    </p>
-                  </div>
-                  <span className="text-xs text-slate-500">
-                    {selectedBoardIds.size} selected
-                  </span>
-                </div>
-
-                <Input
-                  value={boardSearch}
-                  onChange={(event) => setBoardSearch(event.target.value)}
-                  placeholder="Search boards..."
-                  disabled={isLoading || !baseGroup}
-                />
-
-                <div className="max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50/40">
-                  {boardsLoading && boards.length === 0 ? (
-                    <div className="px-4 py-6 text-sm text-slate-500">
-                      Loading boards…
-                    </div>
-                  ) : boardsError ? (
-                    <div className="px-4 py-6 text-sm text-rose-700">
-                      {boardsError.message}
-                    </div>
-                  ) : boards.length === 0 ? (
-                    <div className="px-4 py-6 text-sm text-slate-500">
-                      No boards found.
-                    </div>
-                  ) : (
-                    <ul className="divide-y divide-slate-200">
-                      {boards
-                        .filter((board) => {
-                          const q = boardSearch.trim().toLowerCase();
-                          if (!q) return true;
-                          return (
-                            board.name.toLowerCase().includes(q) ||
-                            board.slug.toLowerCase().includes(q)
-                          );
-                        })
-                        .map((board) => {
-                          const checked = selectedBoardIds.has(board.id);
-                          const isInThisGroup =
-                            board.board_group_id === groupId;
-                          const isAlreadyGrouped =
-                            Boolean(board.board_group_id) && !isInThisGroup;
-                          return (
-                            <li key={board.id} className="px-4 py-3">
-                              <label className="flex cursor-pointer items-start gap-3">
-                                <input
-                                  type="checkbox"
-                                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
-                                  checked={checked}
-                                  onChange={() => {
-                                    setSelectedBoardIds((prev) => {
-                                      const next = new Set(prev);
-                                      if (next.has(board.id)) {
-                                        next.delete(board.id);
-                                      } else {
-                                        next.add(board.id);
-                                      }
-                                      return next;
-                                    });
-                                  }}
-                                  disabled={isLoading || !baseGroup}
-                                />
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium text-slate-900">
-                                    {board.name}
-                                  </p>
-                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                    <span className="font-mono text-[11px] text-slate-400">
-                                      {board.id}
-                                    </span>
-                                    {isAlreadyGrouped ? (
-                                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-900">
-                                        in another group
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </label>
-                            </li>
-                          );
-                        })}
-                    </ul>
-                  )}
-                </div>
-
-                {assignmentsError ? (
-                  <p className="text-sm text-rose-700">{assignmentsError}</p>
-                ) : null}
-                {assignmentsResult ? (
-                  <p className="text-sm text-slate-700">
-                    Updated {assignmentsResult.updated} board
-                    {assignmentsResult.updated === 1 ? "" : "s"}, failed{" "}
-                    {assignmentsResult.failed}.
-                  </p>
-                ) : null}
+            ) : boards.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-slate-500">
+                No boards found.
               </div>
+            ) : (
+              <ul className="divide-y divide-slate-200">
+                {boards
+                  .filter((board) => {
+                    const q = boardSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      board.name.toLowerCase().includes(q) ||
+                      board.slug.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((board) => {
+                    const checked = selectedBoardIds.has(board.id);
+                    const isInThisGroup = board.board_group_id === groupId;
+                    const isAlreadyGrouped =
+                      Boolean(board.board_group_id) && !isInThisGroup;
+                    return (
+                      <li key={board.id} className="px-4 py-3">
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedBoardIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(board.id)) {
+                                  next.delete(board.id);
+                                } else {
+                                  next.add(board.id);
+                                }
+                                return next;
+                              });
+                            }}
+                            disabled={isLoading || !baseGroup}
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-900">
+                              {board.name}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                              <span className="font-mono text-[11px] text-slate-400">
+                                {board.id}
+                              </span>
+                              {isAlreadyGrouped ? (
+                                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-900">
+                                  in another group
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </label>
+                      </li>
+                    );
+                  })}
+              </ul>
+            )}
+          </div>
 
-              {errorMessage ? (
-                <p className="text-sm text-red-500">{errorMessage}</p>
-              ) : null}
+          {assignmentsError ? (
+            <p className="text-sm text-rose-700">{assignmentsError}</p>
+          ) : null}
+          {assignmentsResult ? (
+            <p className="text-sm text-slate-700">
+              Updated {assignmentsResult.updated} board
+              {assignmentsResult.updated === 1 ? "" : "s"}, failed{" "}
+              {assignmentsResult.failed}.
+            </p>
+          ) : null}
+        </div>
 
-              <div className="flex justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => router.push(`/board-groups/${groupId ?? ""}`)}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isLoading || !baseGroup || !isFormReady}
-                >
-                  {isLoading ? "Saving…" : "Save changes"}
-                </Button>
-              </div>
+        {errorMessage ? (
+          <p className="text-sm text-red-500">{errorMessage}</p>
+        ) : null}
+
+        <div className="flex justify-end gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => router.push(`/board-groups/${groupId ?? ""}`)}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isLoading || !baseGroup || !isFormReady}
+          >
+            {isLoading ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
       </form>
     </DashboardPageLayout>
   );

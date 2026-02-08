@@ -21,7 +21,10 @@ import { StatusPill } from "@/components/atoms/StatusPill";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
-import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
+import {
+  TableEmptyStateRow,
+  TableLoadingRow,
+} from "@/components/ui/table-state";
 
 import { ApiError } from "@/api/mutator";
 import {
@@ -257,7 +260,9 @@ export default function AgentsPage() {
         description={`${agents.length} agent${agents.length === 1 ? "" : "s"} total.`}
         headerActions={
           agents.length > 0 ? (
-            <Button onClick={() => router.push("/agents/new")}>New agent</Button>
+            <Button onClick={() => router.push("/agents/new")}>
+              New agent
+            </Button>
           ) : null
         }
         isAdmin={isAdmin}
@@ -330,7 +335,9 @@ export default function AgentsPage() {
         </div>
 
         {agentsQuery.error ? (
-          <p className="mt-4 text-sm text-red-500">{agentsQuery.error.message}</p>
+          <p className="mt-4 text-sm text-red-500">
+            {agentsQuery.error.message}
+          </p>
         ) : null}
       </DashboardPageLayout>
 
@@ -345,8 +352,7 @@ export default function AgentsPage() {
         title="Delete agent"
         description={
           <>
-            This will remove {deleteTarget?.name}. This action cannot be
-            undone.
+            This will remove {deleteTarget?.name}. This action cannot be undone.
           </>
         }
         errorMessage={deleteMutation.error?.message}

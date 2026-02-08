@@ -130,7 +130,9 @@ async def test_dependency_queries_and_replace_and_dependents() -> None:
         # cover empty input short-circuit
         assert await td.dependency_status_by_id(session, board_id=board_id, dependency_ids=[]) == {}
 
-        status_map = await td.dependency_status_by_id(session, board_id=board_id, dependency_ids=[t2, t3])
+        status_map = await td.dependency_status_by_id(
+            session, board_id=board_id, dependency_ids=[t2, t3]
+        )
         assert status_map[t2] == td.DONE_STATUS
         assert status_map[t3] != td.DONE_STATUS
 

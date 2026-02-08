@@ -285,241 +285,237 @@ export default function EditAgentPage() {
         onSubmit={handleSubmit}
         className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-6"
       >
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Basic configuration
-                </p>
-                <div className="mt-4 space-y-6">
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-900">
-                        Agent name <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        value={resolvedName}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="e.g. Deploy bot"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-900">
-                        Role
-                      </label>
-                      <Input
-                        value={resolvedIdentityProfile.role}
-                        onChange={(event) =>
-                          setIdentityProfile({
-                            ...resolvedIdentityProfile,
-                            role: event.target.value,
-                          })
-                        }
-                        placeholder="e.g. Founder, Social Media Manager"
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-slate-900">
-                          Board
-                          {resolvedIsGatewayMain ? (
-                            <span className="ml-2 text-xs font-normal text-slate-500">
-                              optional
-                            </span>
-                          ) : (
-                            <span className="text-red-500"> *</span>
-                          )}
-                        </label>
-                        {resolvedBoardId ? (
-                          <button
-                            type="button"
-                            className="text-xs font-medium text-slate-600 hover:text-slate-900"
-                            onClick={() => {
-                              setBoardId("");
-                            }}
-                            disabled={isLoading}
-                          >
-                            Clear board
-                          </button>
-                        ) : null}
-                      </div>
-                      <SearchableSelect
-                        ariaLabel="Select board"
-                        value={resolvedBoardId}
-                        onValueChange={(value) => setBoardId(value)}
-                        options={getBoardOptions(boards)}
-                        placeholder={
-                          resolvedIsGatewayMain
-                            ? "No board (main agent)"
-                            : "Select board"
-                        }
-                        searchPlaceholder="Search boards..."
-                        emptyMessage="No matching boards."
-                        triggerClassName="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        contentClassName="rounded-xl border border-slate-200 shadow-lg"
-                        itemClassName="px-4 py-3 text-sm text-slate-700 data-[selected=true]:bg-slate-50 data-[selected=true]:text-slate-900"
-                        disabled={boards.length === 0}
-                      />
-                      {resolvedIsGatewayMain ? (
-                        <p className="text-xs text-slate-500">
-                          Main agents are not attached to a board. If a board is
-                          selected, it is only used to resolve the gateway main
-                          session key and will be cleared on save.
-                        </p>
-                      ) : boards.length === 0 ? (
-                        <p className="text-xs text-slate-500">
-                          Create a board before assigning agents.
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-900">
-                        Emoji
-                      </label>
-                      <Select
-                        value={resolvedIdentityProfile.emoji}
-                        onValueChange={(value) =>
-                          setIdentityProfile({
-                            ...resolvedIdentityProfile,
-                            emoji: value,
-                          })
-                        }
-                        disabled={isLoading}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select emoji" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {EMOJI_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.glyph} {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="flex items-start gap-3 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200"
-                      checked={resolvedIsGatewayMain}
-                      onChange={(event) =>
-                        setIsGatewayMain(event.target.checked)
-                      }
-                      disabled={isLoading}
-                    />
-                    <span>
-                      <span className="block font-medium text-slate-900">
-                        Gateway main agent
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Basic configuration
+          </p>
+          <div className="mt-4 space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900">
+                  Agent name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={resolvedName}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Deploy bot"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900">
+                  Role
+                </label>
+                <Input
+                  value={resolvedIdentityProfile.role}
+                  onChange={(event) =>
+                    setIdentityProfile({
+                      ...resolvedIdentityProfile,
+                      role: event.target.value,
+                    })
+                  }
+                  placeholder="e.g. Founder, Social Media Manager"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-900">
+                    Board
+                    {resolvedIsGatewayMain ? (
+                      <span className="ml-2 text-xs font-normal text-slate-500">
+                        optional
                       </span>
-                      <span className="block text-xs text-slate-500">
-                        Uses the gateway main session key and is not tied to a
-                        single board.
-                      </span>
-                    </span>
+                    ) : (
+                      <span className="text-red-500"> *</span>
+                    )}
                   </label>
+                  {resolvedBoardId ? (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                      onClick={() => {
+                        setBoardId("");
+                      }}
+                      disabled={isLoading}
+                    >
+                      Clear board
+                    </button>
+                  ) : null}
                 </div>
+                <SearchableSelect
+                  ariaLabel="Select board"
+                  value={resolvedBoardId}
+                  onValueChange={(value) => setBoardId(value)}
+                  options={getBoardOptions(boards)}
+                  placeholder={
+                    resolvedIsGatewayMain
+                      ? "No board (main agent)"
+                      : "Select board"
+                  }
+                  searchPlaceholder="Search boards..."
+                  emptyMessage="No matching boards."
+                  triggerClassName="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  contentClassName="rounded-xl border border-slate-200 shadow-lg"
+                  itemClassName="px-4 py-3 text-sm text-slate-700 data-[selected=true]:bg-slate-50 data-[selected=true]:text-slate-900"
+                  disabled={boards.length === 0}
+                />
+                {resolvedIsGatewayMain ? (
+                  <p className="text-xs text-slate-500">
+                    Main agents are not attached to a board. If a board is
+                    selected, it is only used to resolve the gateway main
+                    session key and will be cleared on save.
+                  </p>
+                ) : boards.length === 0 ? (
+                  <p className="text-xs text-slate-500">
+                    Create a board before assigning agents.
+                  </p>
+                ) : null}
               </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Personality & behavior
-                </p>
-                <div className="mt-4 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-900">
-                      Communication style
-                    </label>
-                    <Input
-                      value={resolvedIdentityProfile.communication_style}
-                      onChange={(event) =>
-                        setIdentityProfile({
-                          ...resolvedIdentityProfile,
-                          communication_style: event.target.value,
-                        })
-                      }
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-900">
-                      Soul template
-                    </label>
-                    <Textarea
-                      value={resolvedSoulTemplate}
-                      onChange={(event) => setSoulTemplate(event.target.value)}
-                      rows={10}
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Schedule & notifications
-                </p>
-                <div className="mt-4 grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-900">
-                      Interval
-                    </label>
-                    <Input
-                      value={resolvedHeartbeatEvery}
-                      onChange={(event) =>
-                        setHeartbeatEvery(event.target.value)
-                      }
-                      placeholder="e.g. 10m"
-                      disabled={isLoading}
-                    />
-                    <p className="text-xs text-slate-500">
-                      Set how often this agent runs HEARTBEAT.md.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-900">
-                      Target
-                    </label>
-                    <SearchableSelect
-                      ariaLabel="Select heartbeat target"
-                      value={resolvedHeartbeatTarget}
-                      onValueChange={setHeartbeatTarget}
-                      options={HEARTBEAT_TARGET_OPTIONS}
-                      placeholder="Select target"
-                      searchPlaceholder="Search targets..."
-                      emptyMessage="No matching targets."
-                      triggerClassName="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      contentClassName="rounded-xl border border-slate-200 shadow-lg"
-                      itemClassName="px-4 py-3 text-sm text-slate-700 data-[selected=true]:bg-slate-50 data-[selected=true]:text-slate-900"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {errorMessage ? (
-                <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600 shadow-sm">
-                  {errorMessage}
-                </div>
-              ) : null}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Saving…" : "Save changes"}
-                </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => router.push(`/agents/${agentId}`)}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900">
+                  Emoji
+                </label>
+                <Select
+                  value={resolvedIdentityProfile.emoji}
+                  onValueChange={(value) =>
+                    setIdentityProfile({
+                      ...resolvedIdentityProfile,
+                      emoji: value,
+                    })
+                  }
+                  disabled={isLoading}
                 >
-                  Back to agent
-                </Button>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select emoji" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EMOJI_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.glyph} {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+          </div>
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <label className="flex items-start gap-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200"
+                checked={resolvedIsGatewayMain}
+                onChange={(event) => setIsGatewayMain(event.target.checked)}
+                disabled={isLoading}
+              />
+              <span>
+                <span className="block font-medium text-slate-900">
+                  Gateway main agent
+                </span>
+                <span className="block text-xs text-slate-500">
+                  Uses the gateway main session key and is not tied to a single
+                  board.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Personality & behavior
+          </p>
+          <div className="mt-4 space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-900">
+                Communication style
+              </label>
+              <Input
+                value={resolvedIdentityProfile.communication_style}
+                onChange={(event) =>
+                  setIdentityProfile({
+                    ...resolvedIdentityProfile,
+                    communication_style: event.target.value,
+                  })
+                }
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-900">
+                Soul template
+              </label>
+              <Textarea
+                value={resolvedSoulTemplate}
+                onChange={(event) => setSoulTemplate(event.target.value)}
+                rows={10}
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Schedule & notifications
+          </p>
+          <div className="mt-4 grid gap-6 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-900">
+                Interval
+              </label>
+              <Input
+                value={resolvedHeartbeatEvery}
+                onChange={(event) => setHeartbeatEvery(event.target.value)}
+                placeholder="e.g. 10m"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-slate-500">
+                Set how often this agent runs HEARTBEAT.md.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-900">
+                Target
+              </label>
+              <SearchableSelect
+                ariaLabel="Select heartbeat target"
+                value={resolvedHeartbeatTarget}
+                onValueChange={setHeartbeatTarget}
+                options={HEARTBEAT_TARGET_OPTIONS}
+                placeholder="Select target"
+                searchPlaceholder="Search targets..."
+                emptyMessage="No matching targets."
+                triggerClassName="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                contentClassName="rounded-xl border border-slate-200 shadow-lg"
+                itemClassName="px-4 py-3 text-sm text-slate-700 data-[selected=true]:bg-slate-50 data-[selected=true]:text-slate-900"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+        </div>
+
+        {errorMessage ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600 shadow-sm">
+            {errorMessage}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? "Saving…" : "Save changes"}
+          </Button>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => router.push(`/agents/${agentId}`)}
+          >
+            Back to agent
+          </Button>
+        </div>
       </form>
     </DashboardPageLayout>
   );

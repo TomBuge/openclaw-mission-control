@@ -318,9 +318,13 @@ async def delete_board(
     await session.execute(
         delete(BoardOnboardingSession).where(col(BoardOnboardingSession.board_id) == board.id)
     )
-    await session.execute(delete(OrganizationBoardAccess).where(col(OrganizationBoardAccess.board_id) == board.id))
     await session.execute(
-        delete(OrganizationInviteBoardAccess).where(col(OrganizationInviteBoardAccess.board_id) == board.id)
+        delete(OrganizationBoardAccess).where(col(OrganizationBoardAccess.board_id) == board.id)
+    )
+    await session.execute(
+        delete(OrganizationInviteBoardAccess).where(
+            col(OrganizationInviteBoardAccess.board_id) == board.id
+        )
     )
 
     # Tasks reference agents (assigned_agent_id) and have dependents (fingerprints/dependencies), so

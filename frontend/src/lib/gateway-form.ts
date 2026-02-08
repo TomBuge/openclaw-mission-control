@@ -50,7 +50,8 @@ export async function checkGatewayConnection(params: {
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Unable to reach gateway.",
+      message:
+        error instanceof Error ? error.message : "Unable to reach gateway.",
     };
   }
 }

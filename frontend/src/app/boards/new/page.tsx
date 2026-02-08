@@ -225,7 +225,9 @@ export default function NewBoardPage() {
           </div>
         ) : null}
 
-        {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
+        {errorMessage ? (
+          <p className="text-sm text-red-500">{errorMessage}</p>
+        ) : null}
 
         <div className="flex justify-end gap-3">
           <Button

@@ -19,7 +19,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
-import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
+import {
+  TableEmptyStateRow,
+  TableLoadingRow,
+} from "@/components/ui/table-state";
 
 import { ApiError } from "@/api/mutator";
 import {
@@ -196,95 +199,104 @@ export default function GatewaysPage() {
   return (
     <>
       <DashboardPageLayout
-      signedOut={{
-        message: "Sign in to view gateways.",
-        forceRedirectUrl: "/gateways",
-      }}
-      title="Gateways"
-      description="Manage OpenClaw gateway connections used by boards"
-      headerActions={
-        isAdmin && gateways.length > 0 ? (
-          <Link
-            href="/gateways/new"
-            className={buttonVariants({
-              size: "md",
-              variant: "primary",
-            })}
-          >
-            Create gateway
-          </Link>
-        ) : null
-      }
-      isAdmin={isAdmin}
-      adminOnlyMessage="Only organization owners and admins can access gateways."
-      stickyHeader
-    >
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="px-6 py-3">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {gatewaysQuery.isLoading ? (
-                <TableLoadingRow colSpan={columns.length} />
-              ) : table.getRowModel().rows.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50">
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-6 py-4">
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </td>
+        signedOut={{
+          message: "Sign in to view gateways.",
+          forceRedirectUrl: "/gateways",
+        }}
+        title="Gateways"
+        description="Manage OpenClaw gateway connections used by boards"
+        headerActions={
+          isAdmin && gateways.length > 0 ? (
+            <Link
+              href="/gateways/new"
+              className={buttonVariants({
+                size: "md",
+                variant: "primary",
+              })}
+            >
+              Create gateway
+            </Link>
+          ) : null
+        }
+        isAdmin={isAdmin}
+        adminOnlyMessage="Only organization owners and admins can access gateways."
+        stickyHeader
+      >
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th key={header.id} className="px-6 py-3">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </th>
                     ))}
                   </tr>
-                ))
-              ) : (
-                <TableEmptyStateRow
-                  colSpan={columns.length}
-                  icon={
-                    <svg
-                      className="h-16 w-16 text-slate-300"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                    </svg>
-                  }
-                  title="No gateways yet"
-                  description="Create your first gateway to connect boards and start managing your OpenClaw connections."
-                  actionHref="/gateways/new"
-                  actionLabel="Create your first gateway"
-                />
-              )}
-            </tbody>
-          </table>
+                ))}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {gatewaysQuery.isLoading ? (
+                  <TableLoadingRow colSpan={columns.length} />
+                ) : table.getRowModel().rows.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <tr key={row.id} className="hover:bg-slate-50">
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="px-6 py-4">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <TableEmptyStateRow
+                    colSpan={columns.length}
+                    icon={
+                      <svg
+                        className="h-16 w-16 text-slate-300"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect
+                          x="2"
+                          y="7"
+                          width="20"
+                          height="14"
+                          rx="2"
+                          ry="2"
+                        />
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                      </svg>
+                    }
+                    title="No gateways yet"
+                    description="Create your first gateway to connect boards and start managing your OpenClaw connections."
+                    actionHref="/gateways/new"
+                    actionLabel="Create your first gateway"
+                  />
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      {gatewaysQuery.error ? (
-        <p className="mt-4 text-sm text-red-500">{gatewaysQuery.error.message}</p>
-      ) : null}
+        {gatewaysQuery.error ? (
+          <p className="mt-4 text-sm text-red-500">
+            {gatewaysQuery.error.message}
+          </p>
+        ) : null}
       </DashboardPageLayout>
 
       <ConfirmActionDialog

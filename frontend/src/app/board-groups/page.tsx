@@ -26,7 +26,10 @@ import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout"
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { formatTimestamp } from "@/lib/formatters";
-import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
+import {
+  TableEmptyStateRow,
+  TableLoadingRow,
+} from "@/components/ui/table-state";
 
 export default function BoardGroupsPage() {
   const { isSignedIn } = useAuth();
@@ -258,7 +261,9 @@ export default function BoardGroupsPage() {
         </div>
 
         {groupsQuery.error ? (
-          <p className="mt-4 text-sm text-red-500">{groupsQuery.error.message}</p>
+          <p className="mt-4 text-sm text-red-500">
+            {groupsQuery.error.message}
+          </p>
         ) : null}
       </DashboardPageLayout>
       <ConfirmActionDialog

@@ -99,15 +99,21 @@ def test_role_rank_unknown_role_falls_back_to_member_rank() -> None:
 
 
 def test_is_org_admin_owner_admin_member() -> None:
-    assert organizations.is_org_admin(OrganizationMember(organization_id=uuid4(), user_id=uuid4(), role="owner"))
-    assert organizations.is_org_admin(OrganizationMember(organization_id=uuid4(), user_id=uuid4(), role="admin"))
+    assert organizations.is_org_admin(
+        OrganizationMember(organization_id=uuid4(), user_id=uuid4(), role="owner")
+    )
+    assert organizations.is_org_admin(
+        OrganizationMember(organization_id=uuid4(), user_id=uuid4(), role="admin")
+    )
     assert not organizations.is_org_admin(
         OrganizationMember(organization_id=uuid4(), user_id=uuid4(), role="member")
     )
 
 
 @pytest.mark.asyncio
-async def test_ensure_member_for_user_returns_existing_membership(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ensure_member_for_user_returns_existing_membership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     user = User(clerk_user_id="u1")
     existing = OrganizationMember(organization_id=uuid4(), user_id=user.id, role="member")
 
@@ -122,7 +128,9 @@ async def test_ensure_member_for_user_returns_existing_membership(monkeypatch: p
 
 
 @pytest.mark.asyncio
-async def test_ensure_member_for_user_accepts_pending_invite(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ensure_member_for_user_accepts_pending_invite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     org_id = uuid4()
     invite = OrganizationInvite(
         organization_id=org_id,
@@ -140,7 +148,9 @@ async def test_ensure_member_for_user_accepts_pending_invite(monkeypatch: pytest
 
     accepted = OrganizationMember(organization_id=org_id, user_id=user.id, role="member")
 
-    async def _fake_accept(_session: Any, _invite: OrganizationInvite, _user: User) -> OrganizationMember:
+    async def _fake_accept(
+        _session: Any, _invite: OrganizationInvite, _user: User
+    ) -> OrganizationMember:
         assert _invite is invite
         assert _user is user
         return accepted
@@ -155,7 +165,9 @@ async def test_ensure_member_for_user_accepts_pending_invite(monkeypatch: pytest
 
 
 @pytest.mark.asyncio
-async def test_ensure_member_for_user_creates_default_org_and_first_owner(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ensure_member_for_user_creates_default_org_and_first_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     user = User(clerk_user_id="u1", email=None)
     org = Organization(id=uuid4(), name=organizations.DEFAULT_ORG_NAME)
 
@@ -186,7 +198,10 @@ async def test_has_board_access_denies_cross_org() -> None:
     session = _FakeSession(exec_results=[])
     member = OrganizationMember(organization_id=uuid4(), user_id=uuid4(), role="member")
     board = Board(id=uuid4(), organization_id=uuid4(), name="b", slug="b")
-    assert await organizations.has_board_access(session, member=member, board=board, write=False) is False
+    assert (
+        await organizations.has_board_access(session, member=member, board=board, write=False)
+        is False
+    )
 
 
 @pytest.mark.asyncio
@@ -202,7 +217,10 @@ async def test_has_board_access_uses_org_board_access_row_read_and_write() -> No
         can_write=False,
     )
     session = _FakeSession(exec_results=[_FakeExecResult(first_value=access)])
-    assert await organizations.has_board_access(session, member=member, board=board, write=False) is True
+    assert (
+        await organizations.has_board_access(session, member=member, board=board, write=False)
+        is True
+    )
 
     access2 = OrganizationBoardAccess(
         organization_member_id=member.id,
@@ -211,7 +229,10 @@ async def test_has_board_access_uses_org_board_access_row_read_and_write() -> No
         can_write=True,
     )
     session2 = _FakeSession(exec_results=[_FakeExecResult(first_value=access2)])
-    assert await organizations.has_board_access(session2, member=member, board=board, write=False) is True
+    assert (
+        await organizations.has_board_access(session2, member=member, board=board, write=False)
+        is True
+    )
 
     access3 = OrganizationBoardAccess(
         organization_member_id=member.id,
@@ -220,7 +241,10 @@ async def test_has_board_access_uses_org_board_access_row_read_and_write() -> No
         can_write=False,
     )
     session3 = _FakeSession(exec_results=[_FakeExecResult(first_value=access3)])
-    assert await organizations.has_board_access(session3, member=member, board=board, write=True) is False
+    assert (
+        await organizations.has_board_access(session3, member=member, board=board, write=True)
+        is False
+    )
 
 
 @pytest.mark.asyncio
@@ -240,7 +264,9 @@ async def test_require_board_access_raises_when_no_member(monkeypatch: pytest.Mo
 
 
 @pytest.mark.asyncio
-async def test_apply_member_access_update_deletes_existing_and_adds_rows_when_not_all_boards() -> None:
+async def test_apply_member_access_update_deletes_existing_and_adds_rows_when_not_all_boards() -> (
+    None
+):
     member = OrganizationMember(id=uuid4(), organization_id=uuid4(), user_id=uuid4(), role="member")
     update = OrganizationMemberAccessUpdate(
         all_boards_read=False,
@@ -263,7 +289,9 @@ async def test_apply_member_access_update_deletes_existing_and_adds_rows_when_no
 
 
 @pytest.mark.asyncio
-async def test_apply_invite_to_member_upgrades_role_and_merges_access_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_apply_invite_to_member_upgrades_role_and_merges_access_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     org_id = uuid4()
     member = OrganizationMember(
         id=uuid4(),
@@ -294,10 +322,12 @@ async def test_apply_invite_to_member_upgrades_role_and_merges_access_rows(monke
 
     # 1st exec: invite access rows list
     # 2nd exec: existing access (none)
-    session = _FakeSession(exec_results=[
-        [invite_access],
-        _FakeExecResult(first_value=None),
-    ])
+    session = _FakeSession(
+        exec_results=[
+            [invite_access],
+            _FakeExecResult(first_value=None),
+        ]
+    )
 
     await organizations.apply_invite_to_member(session, member=member, invite=invite)
 

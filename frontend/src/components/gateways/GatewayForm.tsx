@@ -159,10 +159,17 @@ export function GatewayForm({
         </div>
       </div>
 
-      {errorMessage ? <p className="text-sm text-red-500">{errorMessage}</p> : null}
+      {errorMessage ? (
+        <p className="text-sm text-red-500">{errorMessage}</p>
+      ) : null}
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={isLoading}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={isLoading}
+        >
           {cancelLabel}
         </Button>
         <Button type="submit" disabled={isLoading || !canSubmit}>

@@ -53,44 +53,55 @@ Cypress.Commands.add("loginWithClerkOtp", () => {
   // Cypress cannot reliably drive Clerk modal/iframe flows.
   cy.visit("/sign-in");
 
-  // The Clerk UI is hosted on a different origin.
-  cy.origin(
-    opts.clerkOrigin,
-    { args: { email: opts.email, otp: opts.otp } },
-    ({ email, otp }) => {
-      cy.get(
-        'input[type="email"], input[name="identifier"], input[autocomplete="email"]',
-        { timeout: 20_000 },
-      )
-        .first()
-        .clear()
-        .type(email, { delay: 10 });
+  // Clerk SignIn can render on our app origin (localhost) or redirect to Clerk-hosted UI,
+  // depending on config/version. Handle both.
+  const fillOtpFlow = (email: string, otp: string) => {
+    cy.get(
+      'input[type="email"], input[name="identifier"], input[autocomplete="email"]',
+      { timeout: 20_000 },
+    )
+      .first()
+      .clear()
+      .type(email, { delay: 10 });
 
-      cy.get('button[type="submit"], button')
-        .contains(/continue|sign in|send|next/i)
-        .click({ force: true });
+    cy.get('button[type="submit"], button')
+      .contains(/continue|sign in|send|next/i)
+      .click({ force: true });
 
-      cy.get(
-        'input[autocomplete="one-time-code"], input[name*="code"], input[inputmode="numeric"]',
-        { timeout: 20_000 },
-      )
-        .first()
-        .clear()
-        .type(otp, { delay: 10 });
+    cy.get(
+      'input[autocomplete="one-time-code"], input[name*="code"], input[inputmode="numeric"]',
+      { timeout: 20_000 },
+    )
+      .first()
+      .clear()
+      .type(otp, { delay: 10 });
 
-      cy.get("body").then(($body) => {
-        const hasSubmit = $body
-          .find('button[type="submit"], button')
-          .toArray()
-          .some((el) => /verify|continue|sign in|confirm/i.test(el.textContent || ""));
-        if (hasSubmit) {
-          cy.get('button[type="submit"], button')
-            .contains(/verify|continue|sign in|confirm/i)
-            .click({ force: true });
-        }
-      });
-    },
-  );
+    cy.get("body").then(($body) => {
+      const hasSubmit = $body
+        .find('button[type="submit"], button')
+        .toArray()
+        .some((el) => /verify|continue|sign in|confirm/i.test(el.textContent || ""));
+      if (hasSubmit) {
+        cy.get('button[type="submit"], button')
+          .contains(/verify|continue|sign in|confirm/i)
+          .click({ force: true });
+      }
+    });
+  };
+
+  cy.location("origin", { timeout: 20_000 }).then((origin) => {
+    if (origin === opts.clerkOrigin) {
+      cy.origin(
+        opts.clerkOrigin,
+        { args: { email: opts.email, otp: opts.otp } },
+        ({ email, otp }) => {
+          fillOtpFlow(email, otp);
+        },
+      );
+    } else {
+      fillOtpFlow(opts.email, opts.otp);
+    }
+  });
 });
 
 declare global {

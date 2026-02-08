@@ -26,7 +26,9 @@ describe("resolveSignInRedirectUrl", () => {
   it("rejects protocol-relative urls", () => {
     vi.stubEnv("NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL", "/activity");
 
-    expect(resolveSignInRedirectUrl("//evil.example.com/path")).toBe("/activity");
+    expect(resolveSignInRedirectUrl("//evil.example.com/path")).toBe(
+      "/activity",
+    );
   });
 
   it("rejects external absolute urls", () => {

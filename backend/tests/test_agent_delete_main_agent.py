@@ -88,10 +88,18 @@ async def test_delete_gateway_main_agent_does_not_require_board_id(monkeypatch: 
     async def _should_not_be_called(*_args, **_kwargs):
         raise AssertionError("require_board/require_gateway should not be called for main agents")
 
-    called: dict[str, int] = {"cleanup_main": 0}
+    called: dict[str, int] = {"delete_lifecycle": 0}
 
-    async def _fake_cleanup_main_agent(_agent: object, _gateway: object) -> str | None:
-        called["cleanup_main"] += 1
+    async def _fake_delete_agent_lifecycle(
+        _self,
+        *,
+        agent: object,
+        gateway: object,
+        delete_files: bool = True,
+        delete_session: bool = True,
+    ) -> str | None:
+        _ = (_self, agent, gateway, delete_files, delete_session)
+        called["delete_lifecycle"] += 1
         return "/tmp/openclaw/workspace-gateway-x"
 
     async def _fake_update_where(*_args, **_kwargs) -> None:
@@ -100,13 +108,16 @@ async def test_delete_gateway_main_agent_does_not_require_board_id(monkeypatch: 
     monkeypatch.setattr(service, "require_agent_access", _no_access_check)
     monkeypatch.setattr(service, "require_board", _should_not_be_called)
     monkeypatch.setattr(service, "require_gateway", _should_not_be_called)
-    monkeypatch.setattr(agent_service, "cleanup_main_agent", _fake_cleanup_main_agent)
+    monkeypatch.setattr(
+        agent_service.OpenClawProvisioningService,
+        "delete_agent_lifecycle",
+        _fake_delete_agent_lifecycle,
+    )
     monkeypatch.setattr(agent_service.crud, "update_where", _fake_update_where)
     monkeypatch.setattr(agent_service, "record_activity", lambda *_a, **_k: None)
 
     result = await service.delete_agent(agent_id=str(agent.id), ctx=ctx)  # type: ignore[arg-type]
 
     assert result.ok is True
-    assert called["cleanup_main"] == 1
+    assert called["delete_lifecycle"] == 1
     assert session.deleted and session.deleted[0] == agent
-

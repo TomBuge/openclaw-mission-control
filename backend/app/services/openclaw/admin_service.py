@@ -17,9 +17,7 @@ from app.db import crud
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
 from app.integrations.openclaw_gateway import (
     OpenClawGatewayError,
-    ensure_session,
     openclaw_call,
-    send_message,
 )
 from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
@@ -30,13 +28,11 @@ from app.schemas.gateways import GatewayTemplatesSyncResult
 from app.services.openclaw.constants import DEFAULT_HEARTBEAT_CONFIG
 from app.services.openclaw.provisioning import (
     GatewayTemplateSyncOptions,
-    MainAgentProvisionRequest,
-    ProvisionOptions,
-    provision_main_agent,
-    sync_gateway_templates,
+    OpenClawProvisioningService,
 )
 from app.services.openclaw.session_service import GatewayTemplateSyncQuery
 from app.services.openclaw.shared import GatewayAgentIdentity
+from app.services.organizations import get_org_owner_user
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -132,30 +128,6 @@ class GatewayAdminLifecycleService:
             .first(self.session)
         )
 
-    @staticmethod
-    def extract_agent_id_from_entry(item: object) -> str | None:
-        if isinstance(item, str):
-            value = item.strip()
-            return value or None
-        if not isinstance(item, dict):
-            return None
-        for key in ("id", "agentId", "agent_id"):
-            raw = item.get(key)
-            if isinstance(raw, str) and raw.strip():
-                return raw.strip()
-        return None
-
-    @staticmethod
-    def extract_agents_list(payload: object) -> list[object]:
-        if isinstance(payload, list):
-            return [item for item in payload]
-        if not isinstance(payload, dict):
-            return []
-        agents = payload.get("agents") or []
-        if not isinstance(agents, list):
-            return []
-        return [item for item in agents]
-
     async def upsert_main_agent_record(self, gateway: Gateway) -> tuple[Agent, bool]:
         changed = False
         session_key = GatewayAgentIdentity.session_key(gateway)
@@ -210,13 +182,13 @@ class GatewayAdminLifecycleService:
         config = GatewayClientConfig(url=gateway.url, token=gateway.token)
         target_id = GatewayAgentIdentity.openclaw_agent_id(gateway)
         try:
-            payload = await openclaw_call("agents.list", config=config)
-        except OpenClawGatewayError:
+            await openclaw_call("agents.files.list", {"agentId": target_id}, config=config)
+        except OpenClawGatewayError as exc:
+            message = str(exc).lower()
+            if any(marker in message for marker in ("not found", "unknown agent", "no such agent")):
+                return False
             return True
-        for item in self.extract_agents_list(payload):
-            if self.extract_agent_id_from_entry(item) == target_id:
-                return True
-        return False
+        return True
 
     async def provision_main_agent_record(
         self,
@@ -227,7 +199,10 @@ class GatewayAdminLifecycleService:
         action: str,
         notify: bool,
     ) -> Agent:
-        session_key = GatewayAgentIdentity.session_key(gateway)
+        template_user = user or await get_org_owner_user(
+            self.session,
+            organization_id=gateway.organization_id,
+        )
         raw_token = generate_agent_token()
         agent.agent_token_hash = hash_agent_token(raw_token)
         agent.provision_requested_at = utcnow()
@@ -241,33 +216,16 @@ class GatewayAdminLifecycleService:
         if not gateway.url:
             return agent
         try:
-            await provision_main_agent(
-                agent,
-                MainAgentProvisionRequest(
-                    gateway=gateway,
-                    auth_token=raw_token,
-                    user=user,
-                    session_key=session_key,
-                    options=ProvisionOptions(action=action),
-                ),
+            await OpenClawProvisioningService().apply_agent_lifecycle(
+                agent=agent,
+                gateway=gateway,
+                board=None,
+                auth_token=raw_token,
+                user=template_user,
+                action=action,
+                wake=notify,
+                deliver_wakeup=True,
             )
-            await ensure_session(
-                session_key,
-                config=GatewayClientConfig(url=gateway.url, token=gateway.token),
-                label=agent.name,
-            )
-            if notify:
-                await send_message(
-                    (
-                        f"Hello {agent.name}. Your gateway provisioning was updated.\n\n"
-                        "Please re-read AGENTS.md, USER.md, HEARTBEAT.md, and TOOLS.md. "
-                        "If BOOTSTRAP.md exists, run it once then delete it. "
-                        "Begin heartbeats after startup."
-                    ),
-                    session_key=session_key,
-                    config=GatewayClientConfig(url=gateway.url, token=gateway.token),
-                    deliver=True,
-                )
             self.logger.info(
                 "gateway.main_agent.provision_success gateway_id=%s agent_id=%s action=%s",
                 gateway.id,
@@ -388,8 +346,7 @@ class GatewayAdminLifecycleService:
             query.include_main,
         )
         await self.ensure_gateway_agents_exist([gateway])
-        result = await sync_gateway_templates(
-            self.session,
+        result = await OpenClawProvisioningService(self.session).sync_gateway_templates(
             gateway,
             GatewayTemplateSyncOptions(
                 user=auth.user,

@@ -93,4 +93,3 @@ async def test_get_auth_context_optional_returns_none_for_agent_token(
         session=_FakeSession(),  # type: ignore[arg-type]
     )
     assert out is None
-

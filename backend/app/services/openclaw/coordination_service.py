@@ -39,7 +39,7 @@ from app.services.openclaw.policies import OpenClawAuthorizationPolicy
 from app.services.openclaw.provisioning import (
     LeadAgentOptions,
     LeadAgentRequest,
-    ensure_board_lead_agent,
+    OpenClawProvisioningService,
 )
 from app.services.openclaw.shared import (
     GatewayAgentIdentity,
@@ -542,8 +542,7 @@ class GatewayCoordinationService(AbstractGatewayMessagingService):
         board: Board,
         message: str,
     ) -> tuple[Agent, bool]:
-        lead, lead_created = await ensure_board_lead_agent(
-            self.session,
+        lead, lead_created = await OpenClawProvisioningService(self.session).ensure_board_lead_agent(
             request=LeadAgentRequest(
                 board=board,
                 gateway=gateway,

@@ -33,12 +33,8 @@ from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.schemas.gateways import GatewayTemplatesSyncError, GatewayTemplatesSyncResult
 from app.services.openclaw.constants import (
-    _COORDINATION_GATEWAY_BASE_DELAY_S,
-    _COORDINATION_GATEWAY_MAX_DELAY_S,
-    _COORDINATION_GATEWAY_TIMEOUT_S,
     _NON_TRANSIENT_GATEWAY_ERROR_MARKERS,
     _SECURE_RANDOM,
-    _SESSION_KEY_PARTS_MIN,
     _TOOLS_KV_RE,
     _TRANSIENT_GATEWAY_ERROR_MARKERS,
     DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY,
@@ -52,7 +48,9 @@ from app.services.openclaw.constants import (
     MAIN_TEMPLATE_MAP,
     PRESERVE_AGENT_EDITABLE_FILES,
 )
+from app.services.openclaw.internal import agent_key as _agent_key
 from app.services.openclaw.shared import GatewayAgentIdentity
+from app.services.organizations import get_org_owner_user
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -69,28 +67,6 @@ class ProvisionOptions:
     reset_session: bool = False
 
 
-@dataclass(frozen=True, slots=True)
-class AgentProvisionRequest:
-    """Inputs required to provision a board-scoped agent."""
-
-    board: Board
-    gateway: Gateway
-    auth_token: str
-    user: User | None
-    options: ProvisionOptions = field(default_factory=ProvisionOptions)
-
-
-@dataclass(frozen=True, slots=True)
-class MainAgentProvisionRequest:
-    """Inputs required to provision a gateway main agent."""
-
-    gateway: Gateway
-    auth_token: str
-    user: User | None
-    session_key: str | None = None
-    options: ProvisionOptions = field(default_factory=ProvisionOptions)
-
-
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
@@ -102,62 +78,6 @@ def _templates_root() -> Path:
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or uuid4().hex
-
-
-def _clean_str(value: object) -> str | None:
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return None
-
-
-def _extract_agent_id_from_item(item: object) -> str | None:
-    if isinstance(item, str):
-        return _clean_str(item)
-    if not isinstance(item, dict):
-        return None
-    for key in ("id", "agentId", "agent_id"):
-        agent_id = _clean_str(item.get(key))
-        if agent_id:
-            return agent_id
-    return None
-
-
-def _extract_agent_id_from_list(items: object) -> str | None:
-    if not isinstance(items, list):
-        return None
-    for item in items:
-        agent_id = _extract_agent_id_from_item(item)
-        if agent_id:
-            return agent_id
-    return None
-
-
-def _extract_agent_id(payload: object) -> str | None:
-    default_keys = ("defaultId", "default_id", "defaultAgentId", "default_agent_id")
-    collection_keys = ("agents", "items", "list", "data")
-
-    if isinstance(payload, list):
-        return _extract_agent_id_from_list(payload)
-    if not isinstance(payload, dict):
-        return None
-    for key in default_keys:
-        agent_id = _clean_str(payload.get(key))
-        if agent_id:
-            return agent_id
-    for key in collection_keys:
-        agent_id = _extract_agent_id_from_list(payload.get(key))
-        if agent_id:
-            return agent_id
-    return None
-
-
-def _agent_key(agent: Agent) -> str:
-    session_key = agent.openclaw_session_id or ""
-    if session_key.startswith("agent:"):
-        parts = session_key.split(":")
-        if len(parts) >= _SESSION_KEY_PARTS_MIN and parts[1]:
-            return parts[1]
-    return _slugify(agent.name)
 
 
 def _heartbeat_config(agent: Agent) -> dict[str, Any]:
@@ -339,9 +259,14 @@ def _build_main_context(
 
 
 def _session_key(agent: Agent) -> str:
-    if agent.openclaw_session_id:
-        return agent.openclaw_session_id
-    return f"agent:{_agent_key(agent)}:main"
+    """Return the deterministic session key for a board-scoped agent.
+
+    Note: Never derive session keys from a human-provided name; use stable ids instead.
+    """
+
+    if agent.is_board_lead and agent.board_id is not None:
+        return f"agent:lead-{agent.board_id}:main"
+    return f"agent:mc-{agent.id}:main"
 
 
 def _render_agent_files(
@@ -426,10 +351,6 @@ class GatewayControlPlane(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_supported_files(self) -> set[str]:
-        raise NotImplementedError
-
-    @abstractmethod
     async def list_agent_files(self, agent_id: str) -> dict[str, dict[str, Any]]:
         raise NotImplementedError
 
@@ -466,35 +387,11 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
             return
         await openclaw_call("sessions.delete", {"key": session_key}, config=self._config)
 
-    async def _agent_ids(self) -> set[str]:
-        payload = await openclaw_call("agents.list", config=self._config)
-        raw_agents: object = payload
-        if isinstance(payload, dict):
-            raw_agents = payload.get("agents") or []
-        if not isinstance(raw_agents, list):
-            return set()
-        ids: set[str] = set()
-        for item in raw_agents:
-            agent_id = _extract_agent_id_from_item(item)
-            if agent_id:
-                ids.add(agent_id)
-        return ids
-
     async def upsert_agent(self, registration: GatewayAgentRegistration) -> None:
-        agent_ids = await self._agent_ids()
-        if registration.agent_id in agent_ids:
-            await openclaw_call(
-                "agents.update",
-                {
-                    "agentId": registration.agent_id,
-                    "name": registration.name,
-                    "workspace": registration.workspace_path,
-                },
-                config=self._config,
-            )
-        else:
-            # `agents.create` derives `agentId` from `name`, so create with the target id
-            # and then set the human-facing name in a follow-up update.
+        # Prefer an idempotent "create then update" flow.
+        # - Avoids a dependency on `agents.list` (which may surface gateway defaults like `main`).
+        # - Ensures we always hit the "create" RPC first, per lifecycle expectations.
+        try:
             await openclaw_call(
                 "agents.create",
                 {
@@ -503,16 +400,19 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
                 },
                 config=self._config,
             )
-            if registration.name != registration.agent_id:
-                await openclaw_call(
-                    "agents.update",
-                    {
-                        "agentId": registration.agent_id,
-                        "name": registration.name,
-                        "workspace": registration.workspace_path,
-                    },
-                    config=self._config,
-                )
+        except OpenClawGatewayError as exc:
+            message = str(exc).lower()
+            if not any(marker in message for marker in ("already", "exist", "duplicate", "conflict")):
+                raise
+        await openclaw_call(
+            "agents.update",
+            {
+                "agentId": registration.agent_id,
+                "name": registration.name,
+                "workspace": registration.workspace_path,
+            },
+            config=self._config,
+        )
         await self.patch_agent_heartbeats(
             [(registration.agent_id, registration.workspace_path, registration.heartbeat)],
         )
@@ -523,37 +423,6 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
             {"agentId": agent_id, "deleteFiles": delete_files},
             config=self._config,
         )
-
-    async def list_supported_files(self) -> set[str]:
-        agents_payload = await openclaw_call("agents.list", config=self._config)
-        agent_id = _extract_agent_id(agents_payload)
-        if not agent_id:
-            return set(DEFAULT_GATEWAY_FILES)
-        files_payload = await openclaw_call(
-            "agents.files.list",
-            {"agentId": agent_id},
-            config=self._config,
-        )
-        if not isinstance(files_payload, dict):
-            return set(DEFAULT_GATEWAY_FILES)
-        files = files_payload.get("files") or []
-        if not isinstance(files, list):
-            return set(DEFAULT_GATEWAY_FILES)
-        supported: set[str] = set()
-        for item in files:
-            if not isinstance(item, dict):
-                continue
-            name = item.get("name")
-            if not isinstance(name, str) or not name:
-                name = item.get("path")
-            if isinstance(name, str) and name:
-                supported.add(name)
-
-        # Always include Mission Control's expected template files even if the gateway's default
-        # agent reports a different file set (e.g. `prompts/system.md`). This prevents provisioning
-        # from silently skipping our templates due to gateway-side defaults or version skew.
-        supported.update(DEFAULT_GATEWAY_FILES)
-        return supported
 
     async def list_agent_files(self, agent_id: str) -> dict[str, dict[str, Any]]:
         payload = await openclaw_call(
@@ -689,6 +558,10 @@ class BaseAgentLifecycleManager(ABC):
     def _template_overrides(self) -> dict[str, str] | None:
         return None
 
+    def _preserve_files(self) -> set[str]:
+        """Files that are expected to evolve inside the agent workspace."""
+        return set(PRESERVE_AGENT_EDITABLE_FILES)
+
     async def _set_agent_files(
         self,
         *,
@@ -703,10 +576,15 @@ class BaseAgentLifecycleManager(ABC):
             # Preserve "editable" files only during updates. During first-time provisioning,
             # the gateway may pre-create defaults for USER/SELF/etc, and we still want to
             # apply Mission Control's templates.
-            if action == "update" and name in PRESERVE_AGENT_EDITABLE_FILES:
+            if action == "update" and name in self._preserve_files():
                 entry = existing_files.get(name)
                 if entry and not bool(entry.get("missing")):
-                    continue
+                    size = entry.get("size")
+                    if isinstance(size, int) and size == 0:
+                        # Treat 0-byte placeholders as missing so update can fill them.
+                        pass
+                    else:
+                        continue
             try:
                 await self._control_plane.set_agent_file(
                     agent_id=agent_id,
@@ -732,12 +610,8 @@ class BaseAgentLifecycleManager(ABC):
         if not self._gateway.workspace_root:
             msg = "gateway_workspace_root is required"
             raise ValueError(msg)
-        if not agent.openclaw_session_id:
-            agent.openclaw_session_id = session_key
-        await self._control_plane.ensure_agent_session(
-            session_key,
-            label=session_label or agent.name,
-        )
+        # Ensure templates render with the active deterministic session key.
+        agent.openclaw_session_id = session_key
 
         agent_id = self._agent_id(agent)
         workspace_path = _workspace_path(agent, self._gateway.workspace_root)
@@ -757,8 +631,9 @@ class BaseAgentLifecycleManager(ABC):
             user=user,
             board=board,
         )
-        supported = await self._control_plane.list_supported_files()
-        supported.update({"USER.md", "SELF.md", "AUTONOMY.md"})
+        # Always attempt to sync Mission Control's full template set.
+        # Do not introspect gateway defaults (avoids touching gateway "main" agent state).
+        file_names = set(DEFAULT_GATEWAY_FILES)
         existing_files = await self._control_plane.list_agent_files(agent_id)
         include_bootstrap = _should_include_bootstrap(
             action=options.action,
@@ -768,7 +643,7 @@ class BaseAgentLifecycleManager(ABC):
         rendered = _render_agent_files(
             context,
             agent,
-            supported,
+            file_names,
             include_bootstrap=include_bootstrap,
             template_overrides=self._template_overrides(),
         )
@@ -780,7 +655,9 @@ class BaseAgentLifecycleManager(ABC):
             action=options.action,
         )
         if options.reset_session:
-            await self._control_plane.reset_agent_session(session_key)
+            # Session resets are useful but should never block file sync.
+            with suppress(OpenClawGatewayError):
+                await self._control_plane.reset_agent_session(session_key)
 
 
 class BoardAgentLifecycleManager(BaseAgentLifecycleManager):
@@ -823,6 +700,13 @@ class GatewayMainAgentLifecycleManager(BaseAgentLifecycleManager):
     def _template_overrides(self) -> dict[str, str] | None:
         return MAIN_TEMPLATE_MAP
 
+    def _preserve_files(self) -> set[str]:
+        # For gateway-main agents, USER.md is system-managed (derived from org/user context),
+        # so keep it in sync even during updates.
+        preserved = super()._preserve_files()
+        preserved.discard("USER.md")
+        return preserved
+
 
 def _control_plane_for_gateway(gateway: Gateway) -> OpenClawGatewayControlPlane:
     if not gateway.url:
@@ -833,7 +717,7 @@ def _control_plane_for_gateway(gateway: Gateway) -> OpenClawGatewayControlPlane:
     )
 
 
-async def patch_gateway_agent_heartbeats(
+async def _patch_gateway_agent_heartbeats(
     gateway: Gateway,
     *,
     entries: list[tuple[str, str, dict[str, Any]]],
@@ -844,22 +728,6 @@ async def patch_gateway_agent_heartbeats(
     """
     control_plane = _control_plane_for_gateway(gateway)
     await control_plane.patch_agent_heartbeats(entries)
-
-
-async def sync_gateway_agent_heartbeats(gateway: Gateway, agents: list[Agent]) -> None:
-    """Sync current Agent.heartbeat_config values to the gateway config."""
-    if not gateway.workspace_root:
-        msg = "gateway workspace_root is required"
-        raise OpenClawGatewayError(msg)
-    entries: list[tuple[str, str, dict[str, Any]]] = []
-    for agent in agents:
-        agent_id = _agent_key(agent)
-        workspace_path = _workspace_path(agent, gateway.workspace_root)
-        heartbeat = _heartbeat_config(agent)
-        entries.append((agent_id, workspace_path, heartbeat))
-    if not entries:
-        return
-    await patch_gateway_agent_heartbeats(gateway, entries=entries)
 
 
 def _should_include_bootstrap(
@@ -876,92 +744,334 @@ def _should_include_bootstrap(
     return not bool(entry and entry.get("missing"))
 
 
-async def provision_agent(
-    agent: Agent,
-    request: AgentProvisionRequest,
-) -> None:
-    """Provision or update a regular board agent workspace."""
-    gateway = request.gateway
-    if not gateway.url:
-        return
-    session_key = _session_key(agent)
-    control_plane = _control_plane_for_gateway(gateway)
-    manager = BoardAgentLifecycleManager(gateway, control_plane)
-    await manager.provision(
-        agent=agent,
-        board=request.board,
-        session_key=session_key,
-        auth_token=request.auth_token,
-        user=request.user,
-        options=request.options,
+def _wakeup_text(agent: Agent, *, verb: str) -> str:
+    return (
+        f"Hello {agent.name}. Your workspace has been {verb}.\n\n"
+        "Start the agent, run BOOT.md, and if BOOTSTRAP.md exists run it once "
+        "then delete it. Begin heartbeats after startup."
     )
 
 
-async def provision_main_agent(
-    agent: Agent,
-    request: MainAgentProvisionRequest,
-) -> None:
-    """Provision or update the gateway main agent workspace."""
-    gateway = request.gateway
-    if not gateway.url:
-        return
-    session_key = (request.session_key or GatewayAgentIdentity.session_key(gateway) or "").strip()
-    if not session_key:
-        msg = "gateway main agent session_key is required"
-        raise ValueError(msg)
-    control_plane = _control_plane_for_gateway(gateway)
-    manager = GatewayMainAgentLifecycleManager(gateway, control_plane)
-    await manager.provision(
-        agent=agent,
-        session_key=session_key,
-        auth_token=request.auth_token,
-        user=request.user,
-        options=request.options,
-        session_label=agent.name or "Gateway Agent",
-    )
+class OpenClawProvisioningService:
+    """High-level agent provisioning interface (create -> files -> wake).
 
+    This is the public entrypoint for agent lifecycle orchestration. Internals are
+    implemented as module-private helpers and lifecycle manager classes.
+    """
 
-async def cleanup_agent(
-    agent: Agent,
-    gateway: Gateway,
-) -> str | None:
-    """Remove an agent from gateway config and delete its session."""
-    if not gateway.url:
-        return None
-    if not gateway.workspace_root:
-        msg = "gateway_workspace_root is required"
-        raise ValueError(msg)
-    control_plane = _control_plane_for_gateway(gateway)
-    agent_id = _agent_key(agent)
-    await control_plane.delete_agent(agent_id, delete_files=True)
+    def __init__(self, session: AsyncSession | None = None) -> None:
+        self._session = session
 
-    session_key = _session_key(agent)
-    with suppress(OpenClawGatewayError):
-        await control_plane.delete_agent_session(session_key)
-    return None
+    def _require_session(self) -> AsyncSession:
+        if self._session is None:
+            msg = "AsyncSession is required for this operation"
+            raise ValueError(msg)
+        return self._session
 
+    async def sync_gateway_agent_heartbeats(self, gateway: Gateway, agents: list[Agent]) -> None:
+        """Sync current Agent.heartbeat_config values to the gateway config."""
+        if not gateway.workspace_root:
+            msg = "gateway workspace_root is required"
+            raise OpenClawGatewayError(msg)
+        entries: list[tuple[str, str, dict[str, Any]]] = []
+        for agent in agents:
+            agent_id = _agent_key(agent)
+            workspace_path = _workspace_path(agent, gateway.workspace_root)
+            heartbeat = _heartbeat_config(agent)
+            entries.append((agent_id, workspace_path, heartbeat))
+        if not entries:
+            return
+        await _patch_gateway_agent_heartbeats(gateway, entries=entries)
 
-async def cleanup_main_agent(
-    agent: Agent,
-    gateway: Gateway,
-) -> str | None:
-    """Remove the gateway-main agent from gateway config and delete its session."""
-    if not gateway.url:
-        return None
-    if not gateway.workspace_root:
-        msg = "gateway_workspace_root is required"
-        raise ValueError(msg)
+    async def apply_agent_lifecycle(
+        self,
+        *,
+        agent: Agent,
+        gateway: Gateway,
+        board: Board | None,
+        auth_token: str,
+        user: User | None,
+        action: str = "provision",
+        force_bootstrap: bool = False,
+        reset_session: bool = False,
+        wake: bool = True,
+        deliver_wakeup: bool = True,
+        wakeup_verb: str | None = None,
+    ) -> None:
+        """Create/update an agent, sync all template files, and optionally wake the agent.
 
-    workspace_path = _workspace_path(agent, gateway.workspace_root)
-    control_plane = _control_plane_for_gateway(gateway)
-    agent_id = GatewayAgentIdentity.openclaw_agent_id(gateway)
-    await control_plane.delete_agent(agent_id, delete_files=True)
+        Lifecycle steps (same for all agent types):
+        1) create agent (idempotent)
+        2) set/update all template files (best-effort for unsupported files)
+        3) wake the agent session (chat.send)
+        """
 
-    session_key = (agent.openclaw_session_id or GatewayAgentIdentity.session_key(gateway) or "").strip()
-    if session_key:
-        with suppress(OpenClawGatewayError):
-            await control_plane.delete_agent_session(session_key)
-    return workspace_path
+        if not gateway.url:
+            return
+
+        # Guard against accidental main-agent provisioning without a board.
+        if board is None and getattr(agent, "board_id", None) is not None:
+            msg = "board is required for board-scoped agent lifecycle"
+            raise ValueError(msg)
+
+        # Resolve session key and agent type.
+        if board is None:
+            session_key = (agent.openclaw_session_id or GatewayAgentIdentity.session_key(gateway) or "").strip()
+            if not session_key:
+                msg = "gateway main agent session_key is required"
+                raise ValueError(msg)
+            manager_type: type[BaseAgentLifecycleManager] = GatewayMainAgentLifecycleManager
+        else:
+            session_key = _session_key(agent)
+            manager_type = BoardAgentLifecycleManager
+
+        control_plane = _control_plane_for_gateway(gateway)
+        manager = manager_type(gateway, control_plane)
+        await manager.provision(
+            agent=agent,
+            board=board,
+            session_key=session_key,
+            auth_token=auth_token,
+            user=user,
+            options=ProvisionOptions(
+                action=action,
+                force_bootstrap=force_bootstrap,
+                reset_session=False,  # handled below
+            ),
+            session_label=agent.name or "Gateway Agent",
+        )
+
+        if reset_session:
+            with suppress(OpenClawGatewayError):
+                await control_plane.reset_agent_session(session_key)
+
+        if not wake:
+            return
+
+        client_config = GatewayClientConfig(url=gateway.url, token=gateway.token)
+        await ensure_session(session_key, config=client_config, label=agent.name)
+        verb = wakeup_verb or ("provisioned" if action == "provision" else "updated")
+        await send_message(
+            _wakeup_text(agent, verb=verb),
+            session_key=session_key,
+            config=client_config,
+            deliver=deliver_wakeup,
+        )
+
+    async def delete_agent_lifecycle(
+        self,
+        *,
+        agent: Agent,
+        gateway: Gateway,
+        delete_files: bool = True,
+        delete_session: bool = True,
+    ) -> str | None:
+        """Remove agent runtime state from the gateway (agent + optional session)."""
+
+        if not gateway.url:
+            return None
+        if not gateway.workspace_root:
+            msg = "gateway_workspace_root is required"
+            raise ValueError(msg)
+
+        workspace_path = _workspace_path(agent, gateway.workspace_root)
+        control_plane = _control_plane_for_gateway(gateway)
+
+        if agent.board_id is None:
+            agent_gateway_id = GatewayAgentIdentity.openclaw_agent_id(gateway)
+        else:
+            agent_gateway_id = _agent_key(agent)
+        await control_plane.delete_agent(agent_gateway_id, delete_files=delete_files)
+
+        if delete_session:
+            if agent.board_id is None:
+                session_key = (agent.openclaw_session_id or GatewayAgentIdentity.session_key(gateway) or "").strip()
+            else:
+                session_key = _session_key(agent)
+            if session_key:
+                with suppress(OpenClawGatewayError):
+                    await control_plane.delete_agent_session(session_key)
+
+        return workspace_path
+
+    async def sync_gateway_templates(
+        self,
+        gateway: Gateway,
+        options: GatewayTemplateSyncOptions,
+    ) -> GatewayTemplatesSyncResult:
+        """Synchronize AGENTS/TOOLS/etc templates to gateway-connected agents."""
+        session = self._require_session()
+        template_user = options.user
+        if template_user is None:
+            template_user = await get_org_owner_user(
+                session,
+                organization_id=gateway.organization_id,
+            )
+            options = GatewayTemplateSyncOptions(
+                user=template_user,
+                include_main=options.include_main,
+                reset_sessions=options.reset_sessions,
+                rotate_tokens=options.rotate_tokens,
+                force_bootstrap=options.force_bootstrap,
+                board_id=options.board_id,
+            )
+        result = _base_result(
+            gateway,
+            include_main=options.include_main,
+            reset_sessions=options.reset_sessions,
+        )
+        if not gateway.url:
+            _append_sync_error(
+                result,
+                message="Gateway URL is not configured for this gateway.",
+            )
+            return result
+
+        ctx = _SyncContext(
+            session=session,
+            gateway=gateway,
+            config=GatewayClientConfig(url=gateway.url, token=gateway.token),
+            backoff=_GatewayBackoff(timeout_s=10 * 60, timeout_context="template sync"),
+            options=options,
+            provisioner=self,
+        )
+        if not await _ping_gateway(ctx, result):
+            return result
+
+        boards = await Board.objects.filter_by(gateway_id=gateway.id).all(session)
+        boards_by_id = _boards_by_id(boards, board_id=options.board_id)
+        if boards_by_id is None:
+            _append_sync_error(
+                result,
+                message="Board does not belong to this gateway.",
+            )
+            return result
+        paused_board_ids = await _paused_board_ids(session, list(boards_by_id.keys()))
+        if boards_by_id:
+            agents = await (
+                Agent.objects.by_field_in("board_id", list(boards_by_id.keys()))
+                .order_by(col(Agent.created_at).asc())
+                .all(session)
+            )
+        else:
+            agents = []
+
+        stop_sync = False
+        for agent in agents:
+            board = boards_by_id.get(agent.board_id) if agent.board_id is not None else None
+            if board is None:
+                result.agents_skipped += 1
+                _append_sync_error(
+                    result,
+                    agent=agent,
+                    message="Skipping agent: board not found for agent.",
+                )
+                continue
+            if board.id in paused_board_ids:
+                result.agents_skipped += 1
+                continue
+            stop_sync = await _sync_one_agent(ctx, result, agent, board)
+            if stop_sync:
+                break
+
+        if not stop_sync and options.include_main:
+            await _sync_main_agent(ctx, result)
+        return result
+
+    @staticmethod
+    def lead_session_key(board: Board) -> str:
+        """Return the deterministic session key for a board lead agent."""
+        return f"agent:lead-{board.id}:main"
+
+    @staticmethod
+    def lead_agent_name(_: Board) -> str:
+        """Return the default display name for board lead agents."""
+        return "Lead Agent"
+
+    async def ensure_board_lead_agent(
+        self,
+        *,
+        request: LeadAgentRequest,
+    ) -> tuple[Agent, bool]:
+        """Ensure a board has a lead agent; return `(agent, created)`."""
+        session = self._require_session()
+        board = request.board
+        config_options = request.options
+        existing = (
+            await session.exec(
+                select(Agent)
+                .where(Agent.board_id == board.id)
+                .where(col(Agent.is_board_lead).is_(True)),
+            )
+        ).first()
+        if existing:
+            desired_name = config_options.agent_name or self.lead_agent_name(board)
+            changed = False
+            if existing.name != desired_name:
+                existing.name = desired_name
+                changed = True
+            if existing.gateway_id != request.gateway.id:
+                existing.gateway_id = request.gateway.id
+                changed = True
+            desired_session_key = self.lead_session_key(board)
+            if existing.openclaw_session_id != desired_session_key:
+                existing.openclaw_session_id = desired_session_key
+                changed = True
+            if changed:
+                existing.updated_at = utcnow()
+                session.add(existing)
+                await session.commit()
+                await session.refresh(existing)
+            return existing, False
+
+        merged_identity_profile: dict[str, Any] = {
+            "role": "Board Lead",
+            "communication_style": "direct, concise, practical",
+            "emoji": ":gear:",
+        }
+        if config_options.identity_profile:
+            merged_identity_profile.update(
+                {
+                    key: value.strip()
+                    for key, value in config_options.identity_profile.items()
+                    if value.strip()
+                },
+            )
+
+        agent = Agent(
+            name=config_options.agent_name or self.lead_agent_name(board),
+            status="provisioning",
+            board_id=board.id,
+            gateway_id=request.gateway.id,
+            is_board_lead=True,
+            heartbeat_config=DEFAULT_HEARTBEAT_CONFIG.copy(),
+            identity_profile=merged_identity_profile,
+            openclaw_session_id=self.lead_session_key(board),
+            provision_requested_at=utcnow(),
+            provision_action=config_options.action,
+        )
+        raw_token = generate_agent_token()
+        agent.agent_token_hash = hash_agent_token(raw_token)
+        session.add(agent)
+        await session.commit()
+        await session.refresh(agent)
+
+        try:
+            await self.apply_agent_lifecycle(
+                agent=agent,
+                gateway=request.gateway,
+                board=board,
+                auth_token=raw_token,
+                user=request.user,
+                action=config_options.action,
+                wake=True,
+                deliver_wakeup=True,
+            )
+        except OpenClawGatewayError:
+            # Best-effort provisioning. The board/agent rows should still exist.
+            pass
+
+        return agent, True
 
 
 _T = TypeVar("_T")
@@ -988,6 +1098,7 @@ class _SyncContext:
     config: GatewayClientConfig
     backoff: _GatewayBackoff
     options: GatewayTemplateSyncOptions
+    provisioner: OpenClawProvisioningService
 
 
 def _is_transient_gateway_error(exc: Exception) -> bool:
@@ -1089,19 +1200,6 @@ async def _with_gateway_retry(
     backoff: _GatewayBackoff,
 ) -> _T:
     return await backoff.run(fn)
-
-
-async def _with_coordination_gateway_retry(fn: Callable[[], Awaitable[_T]]) -> _T:
-    return await _with_gateway_retry(
-        fn,
-        backoff=_GatewayBackoff(
-            timeout_s=_COORDINATION_GATEWAY_TIMEOUT_S,
-            base_delay_s=_COORDINATION_GATEWAY_BASE_DELAY_S,
-            max_delay_s=_COORDINATION_GATEWAY_MAX_DELAY_S,
-            jitter=0.15,
-            timeout_context="gateway coordination",
-        ),
-    )
 
 
 def _parse_tools_md(content: str) -> dict[str, str]:
@@ -1226,7 +1324,8 @@ async def _ping_gateway(ctx: _SyncContext, result: GatewayTemplatesSyncResult) -
     try:
 
         async def _do_ping() -> object:
-            return await openclaw_call("agents.list", config=ctx.config)
+            # Use a lightweight health probe; avoid enumerating gateway agents.
+            return await openclaw_call("health", config=ctx.config)
 
         await ctx.backoff.run(_do_ping)
     except (TimeoutError, OpenClawGatewayError) as exc:
@@ -1338,19 +1437,16 @@ async def _sync_one_agent(
     try:
 
         async def _do_provision() -> bool:
-            await provision_agent(
-                agent,
-                AgentProvisionRequest(
-                    board=board,
-                    gateway=ctx.gateway,
-                    auth_token=auth_token,
-                    user=ctx.options.user,
-                    options=ProvisionOptions(
-                        action="update",
-                        force_bootstrap=ctx.options.force_bootstrap,
-                        reset_session=ctx.options.reset_sessions,
-                    ),
-                ),
+            await ctx.provisioner.apply_agent_lifecycle(
+                agent=agent,
+                gateway=ctx.gateway,
+                board=board,
+                auth_token=auth_token,
+                user=ctx.options.user,
+                action="update",
+                force_bootstrap=ctx.options.force_bootstrap,
+                reset_session=ctx.options.reset_sessions,
+                wake=False,
             )
             return True
 
@@ -1377,7 +1473,6 @@ async def _sync_main_agent(
     ctx: _SyncContext,
     result: GatewayTemplatesSyncResult,
 ) -> bool:
-    main_session_key = GatewayAgentIdentity.session_key(ctx.gateway)
     main_agent = (
         await Agent.objects.all()
         .filter(col(Agent.gateway_id) == ctx.gateway.id)
@@ -1412,19 +1507,16 @@ async def _sync_main_agent(
     try:
 
         async def _do_provision_main() -> bool:
-            await provision_main_agent(
-                main_agent,
-                MainAgentProvisionRequest(
-                    gateway=ctx.gateway,
-                    auth_token=token,
-                    user=ctx.options.user,
-                    session_key=main_session_key,
-                    options=ProvisionOptions(
-                        action="update",
-                        force_bootstrap=ctx.options.force_bootstrap,
-                        reset_session=ctx.options.reset_sessions,
-                    ),
-                ),
+            await ctx.provisioner.apply_agent_lifecycle(
+                agent=main_agent,
+                gateway=ctx.gateway,
+                board=None,
+                auth_token=token,
+                user=ctx.options.user,
+                action="update",
+                force_bootstrap=ctx.options.force_bootstrap,
+                reset_session=ctx.options.reset_sessions,
+                wake=False,
             )
             return True
 
@@ -1441,86 +1533,6 @@ async def _sync_main_agent(
     else:
         result.main_updated = True
     return stop_sync
-
-
-async def sync_gateway_templates(
-    session: AsyncSession,
-    gateway: Gateway,
-    options: GatewayTemplateSyncOptions,
-) -> GatewayTemplatesSyncResult:
-    """Synchronize AGENTS/TOOLS/etc templates to gateway-connected agents."""
-    result = _base_result(
-        gateway,
-        include_main=options.include_main,
-        reset_sessions=options.reset_sessions,
-    )
-    if not gateway.url:
-        _append_sync_error(
-            result,
-            message="Gateway URL is not configured for this gateway.",
-        )
-        return result
-
-    ctx = _SyncContext(
-        session=session,
-        gateway=gateway,
-        config=GatewayClientConfig(url=gateway.url, token=gateway.token),
-        backoff=_GatewayBackoff(timeout_s=10 * 60, timeout_context="template sync"),
-        options=options,
-    )
-    if not await _ping_gateway(ctx, result):
-        return result
-
-    boards = await Board.objects.filter_by(gateway_id=gateway.id).all(session)
-    boards_by_id = _boards_by_id(boards, board_id=options.board_id)
-    if boards_by_id is None:
-        _append_sync_error(
-            result,
-            message="Board does not belong to this gateway.",
-        )
-        return result
-    paused_board_ids = await _paused_board_ids(session, list(boards_by_id.keys()))
-    if boards_by_id:
-        agents = await (
-            Agent.objects.by_field_in("board_id", list(boards_by_id.keys()))
-            .order_by(col(Agent.created_at).asc())
-            .all(session)
-        )
-    else:
-        agents = []
-
-    stop_sync = False
-    for agent in agents:
-        board = boards_by_id.get(agent.board_id) if agent.board_id is not None else None
-        if board is None:
-            result.agents_skipped += 1
-            _append_sync_error(
-                result,
-                agent=agent,
-                message="Skipping agent: board not found for agent.",
-            )
-            continue
-        if board.id in paused_board_ids:
-            result.agents_skipped += 1
-            continue
-        stop_sync = await _sync_one_agent(ctx, result, agent, board)
-        if stop_sync:
-            break
-
-    if not stop_sync and options.include_main:
-        await _sync_main_agent(ctx, result)
-    return result
-
-
-# Board lead lifecycle primitives consolidated from app.services.board_leads.
-def lead_session_key(board: Board) -> str:
-    """Return the deterministic main session key for a board lead agent."""
-    return f"agent:lead-{board.id}:main"
-
-
-def lead_agent_name(_: Board) -> str:
-    """Return the default display name for board lead agents."""
-    return "Lead Agent"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1541,104 +1553,3 @@ class LeadAgentRequest:
     config: GatewayClientConfig
     user: User | None
     options: LeadAgentOptions = field(default_factory=LeadAgentOptions)
-
-
-async def ensure_board_lead_agent(
-    session: AsyncSession,
-    *,
-    request: LeadAgentRequest,
-) -> tuple[Agent, bool]:
-    """Ensure a board has a lead agent; return `(agent, created)`."""
-    board = request.board
-    config_options = request.options
-    existing = (
-        await session.exec(
-            select(Agent)
-            .where(Agent.board_id == board.id)
-            .where(col(Agent.is_board_lead).is_(True)),
-        )
-    ).first()
-    if existing:
-        desired_name = config_options.agent_name or lead_agent_name(board)
-        changed = False
-        if existing.name != desired_name:
-            existing.name = desired_name
-            changed = True
-        if existing.gateway_id != request.gateway.id:
-            existing.gateway_id = request.gateway.id
-            changed = True
-        desired_session_key = lead_session_key(board)
-        if not existing.openclaw_session_id:
-            existing.openclaw_session_id = desired_session_key
-            changed = True
-        if changed:
-            existing.updated_at = utcnow()
-            session.add(existing)
-            await session.commit()
-            await session.refresh(existing)
-        return existing, False
-
-    merged_identity_profile: dict[str, Any] = {
-        "role": "Board Lead",
-        "communication_style": "direct, concise, practical",
-        "emoji": ":gear:",
-    }
-    if config_options.identity_profile:
-        merged_identity_profile.update(
-            {
-                key: value.strip()
-                for key, value in config_options.identity_profile.items()
-                if value.strip()
-            },
-        )
-
-    agent = Agent(
-        name=config_options.agent_name or lead_agent_name(board),
-        status="provisioning",
-        board_id=board.id,
-        gateway_id=request.gateway.id,
-        is_board_lead=True,
-        heartbeat_config=DEFAULT_HEARTBEAT_CONFIG.copy(),
-        identity_profile=merged_identity_profile,
-        openclaw_session_id=lead_session_key(board),
-        provision_requested_at=utcnow(),
-        provision_action=config_options.action,
-    )
-    raw_token = generate_agent_token()
-    agent.agent_token_hash = hash_agent_token(raw_token)
-    session.add(agent)
-    await session.commit()
-    await session.refresh(agent)
-
-    try:
-        await provision_agent(
-            agent,
-            AgentProvisionRequest(
-                board=board,
-                gateway=request.gateway,
-                auth_token=raw_token,
-                user=request.user,
-                options=ProvisionOptions(action=config_options.action),
-            ),
-        )
-        if agent.openclaw_session_id:
-            await ensure_session(
-                agent.openclaw_session_id,
-                config=request.config,
-                label=agent.name,
-            )
-            await send_message(
-                (
-                    f"Hello {agent.name}. Your workspace has been provisioned.\n\n"
-                    "Start the agent, run BOOT.md, and if BOOTSTRAP.md exists run "
-                    "it once then delete it. Begin heartbeats after startup."
-                ),
-                session_key=agent.openclaw_session_id,
-                config=request.config,
-                deliver=True,
-            )
-    except OpenClawGatewayError:
-        # Best-effort provisioning. The board/agent rows should still exist.
-        pass
-
-    return agent, True

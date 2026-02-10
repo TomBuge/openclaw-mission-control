@@ -25,27 +25,6 @@ def test_slugify_falls_back_to_uuid_hex(monkeypatch):
     assert agent_provisioning._slugify("!!!") == "deadbeef"
 
 
-def test_extract_agent_id_supports_lists_and_dicts():
-    assert agent_provisioning._extract_agent_id(["", "  ", "abc"]) == "abc"
-    assert agent_provisioning._extract_agent_id([{"agent_id": "xyz"}]) == "xyz"
-
-    payload = {
-        "defaultAgentId": "dflt",
-        "agents": [{"id": "ignored"}],
-    }
-    assert agent_provisioning._extract_agent_id(payload) == "dflt"
-
-    payload2 = {
-        "agents": [{"id": ""}, {"agentId": "foo"}],
-    }
-    assert agent_provisioning._extract_agent_id(payload2) == "foo"
-
-
-def test_extract_agent_id_returns_none_for_unknown_shapes():
-    assert agent_provisioning._extract_agent_id("nope") is None
-    assert agent_provisioning._extract_agent_id({"agents": "not-a-list"}) is None
-
-
 @dataclass
 class _AgentStub:
     name: str
@@ -58,13 +37,13 @@ class _AgentStub:
     soul_template: str | None = None
 
 
-def test_agent_key_uses_session_key_when_present(monkeypatch):
+def test_agent_key_uses_session_key_when_present():
     agent = _AgentStub(name="Alice", openclaw_session_id="agent:alice:main")
     assert agent_provisioning._agent_key(agent) == "alice"
 
-    monkeypatch.setattr(agent_provisioning, "_slugify", lambda value: "slugged")
-    agent2 = _AgentStub(name="Alice", openclaw_session_id=None)
-    assert agent_provisioning._agent_key(agent2) == "slugged"
+    agent2 = _AgentStub(name="Hello, World", openclaw_session_id=None)
+    assert agent_provisioning._agent_key(agent2) == "hello-world"
+
 
 def test_workspace_path_preserves_tilde_in_workspace_root():
     # Mission Control accepts a user-entered workspace root (from the UI) and must
@@ -118,9 +97,6 @@ async def test_provision_main_agent_uses_dedicated_openclaw_agent_id(monkeypatch
         captured["patched_agent_id"] = registration.agent_id
         captured["workspace_path"] = registration.workspace_path
 
-    async def _fake_list_supported_files(self):
-        return set()
-
     async def _fake_list_agent_files(self, agent_id):
         captured["files_index_agent_id"] = agent_id
         return {}
@@ -143,11 +119,6 @@ async def test_provision_main_agent_uses_dedicated_openclaw_agent_id(monkeypatch
     )
     monkeypatch.setattr(
         agent_provisioning.OpenClawGatewayControlPlane,
-        "list_supported_files",
-        _fake_list_supported_files,
-    )
-    monkeypatch.setattr(
-        agent_provisioning.OpenClawGatewayControlPlane,
         "list_agent_files",
         _fake_list_agent_files,
     )
@@ -158,44 +129,19 @@ async def test_provision_main_agent_uses_dedicated_openclaw_agent_id(monkeypatch
         _fake_set_agent_files,
     )
 
-    await agent_provisioning.provision_main_agent(
-        agent,
-        agent_provisioning.MainAgentProvisionRequest(
-            gateway=gateway,
-            auth_token="secret-token",
-            user=None,
-            session_key=session_key,
-        ),
+    await agent_provisioning.OpenClawProvisioningService().apply_agent_lifecycle(
+        agent=agent,  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        board=None,
+        auth_token="secret-token",
+        user=None,
+        action="provision",
+        wake=False,
     )
 
     expected_agent_id = GatewayAgentIdentity.openclaw_agent_id_for_id(gateway_id)
     assert captured["patched_agent_id"] == expected_agent_id
     assert captured["files_index_agent_id"] == expected_agent_id
-
-
-@pytest.mark.asyncio
-async def test_list_supported_files_always_includes_default_gateway_files(monkeypatch):
-    """Provisioning should not depend solely on whatever the gateway's default agent reports."""
-
-    async def _fake_openclaw_call(method, params=None, config=None):
-        _ = config
-        if method == "agents.list":
-            return {"defaultId": "main"}
-        if method == "agents.files.list":
-            assert params == {"agentId": "main"}
-            return {"files": [{"path": "prompts/system.md", "missing": True}]}
-        raise AssertionError(f"Unexpected method: {method}")
-
-    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
-    cp = agent_provisioning.OpenClawGatewayControlPlane(
-        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
-    )
-    supported = await cp.list_supported_files()
-
-    # Newer gateways may surface other file paths, but we still must include our templates.
-    assert "prompts/system.md" in supported
-    for required in agent_provisioning.DEFAULT_GATEWAY_FILES:
-        assert required in supported
 
 
 @pytest.mark.asyncio
@@ -220,10 +166,6 @@ async def test_provision_overwrites_user_md_on_first_provision(monkeypatch):
 
         async def delete_agent(self, agent_id, *, delete_files=True):
             return None
-
-        async def list_supported_files(self):
-            # Minimal set.
-            return {"USER.md"}
 
         async def list_agent_files(self, agent_id):
             # Pretend gateway created USER.md already.
@@ -268,3 +210,137 @@ async def test_provision_overwrites_user_md_on_first_provision(monkeypatch):
         action="provision",
     )
     assert ("USER.md", "from-mc") in cp.writes
+
+
+@pytest.mark.asyncio
+async def test_set_agent_files_update_writes_zero_size_user_md():
+    """Treat empty placeholder files as missing during update."""
+
+    class _ControlPlaneStub:
+        def __init__(self):
+            self.writes: list[tuple[str, str]] = []
+
+        async def ensure_agent_session(self, session_key, *, label=None):
+            return None
+
+        async def reset_agent_session(self, session_key):
+            return None
+
+        async def delete_agent_session(self, session_key):
+            return None
+
+        async def upsert_agent(self, registration):
+            return None
+
+        async def delete_agent(self, agent_id, *, delete_files=True):
+            return None
+
+        async def list_agent_files(self, agent_id):
+            return {}
+
+        async def set_agent_file(self, *, agent_id, name, content):
+            self.writes.append((name, content))
+
+        async def patch_agent_heartbeats(self, entries):
+            return None
+
+    @dataclass
+    class _GatewayTiny:
+        id: UUID
+        name: str
+        url: str
+        token: str | None
+        workspace_root: str
+
+    class _Manager(agent_provisioning.BaseAgentLifecycleManager):
+        def _agent_id(self, agent):
+            return "agent-x"
+
+        def _build_context(self, *, agent, auth_token, user, board):
+            return {}
+
+    gateway = _GatewayTiny(
+        id=uuid4(),
+        name="G",
+        url="ws://x",
+        token=None,
+        workspace_root="/tmp",
+    )
+    cp = _ControlPlaneStub()
+    mgr = _Manager(gateway, cp)  # type: ignore[arg-type]
+
+    await mgr._set_agent_files(
+        agent_id="agent-x",
+        rendered={"USER.md": "filled"},
+        existing_files={"USER.md": {"name": "USER.md", "missing": False, "size": 0}},
+        action="update",
+    )
+    assert ("USER.md", "filled") in cp.writes
+
+
+@pytest.mark.asyncio
+async def test_control_plane_upsert_agent_create_then_update(monkeypatch):
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "agents.create":
+            return {"ok": True}
+        if method == "agents.update":
+            return {"ok": True}
+        if method == "config.get":
+            return {"hash": None, "config": {"agents": {"list": []}}}
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    cp = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+    await cp.upsert_agent(
+        agent_provisioning.GatewayAgentRegistration(
+            agent_id="board-agent-a",
+            name="Board Agent A",
+            workspace_path="/tmp/workspace-board-agent-a",
+            heartbeat={"every": "10m", "target": "none", "includeReasoning": False},
+        ),
+    )
+
+    assert calls[0][0] == "agents.create"
+    assert calls[1][0] == "agents.update"
+
+
+@pytest.mark.asyncio
+async def test_control_plane_upsert_agent_handles_already_exists(monkeypatch):
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "agents.create":
+            raise agent_provisioning.OpenClawGatewayError("already exists")
+        if method == "agents.update":
+            return {"ok": True}
+        if method == "config.get":
+            return {"hash": None, "config": {"agents": {"list": []}}}
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    cp = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+    await cp.upsert_agent(
+        agent_provisioning.GatewayAgentRegistration(
+            agent_id="board-agent-a",
+            name="Board Agent A",
+            workspace_path="/tmp/workspace-board-agent-a",
+            heartbeat={"every": "10m", "target": "none", "includeReasoning": False},
+        ),
+    )
+
+    assert calls[0][0] == "agents.create"
+    assert calls[1][0] == "agents.update"

@@ -61,6 +61,23 @@ async def get_member(
     ).first(session)
 
 
+async def get_org_owner_user(
+    session: AsyncSession,
+    *,
+    organization_id: UUID,
+) -> User | None:
+    """Return the org owner User, if one exists."""
+    owner = (
+        await OrganizationMember.objects.filter_by(organization_id=organization_id)
+        .filter(col(OrganizationMember.role) == "owner")
+        .order_by(col(OrganizationMember.created_at).asc())
+        .first(session)
+    )
+    if owner is None:
+        return None
+    return await User.objects.by_id(owner.user_id).first(session)
+
+
 async def get_first_membership(
     session: AsyncSession,
     user_id: UUID,

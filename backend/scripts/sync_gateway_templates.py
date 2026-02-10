@@ -54,7 +54,7 @@ async def _run() -> int:
     from app.models.gateways import Gateway
     from app.services.openclaw.provisioning import (
         GatewayTemplateSyncOptions,
-        sync_gateway_templates,
+        OpenClawProvisioningService,
     )
 
     args = _parse_args()
@@ -67,10 +67,9 @@ async def _run() -> int:
             message = f"Gateway not found: {gateway_id}"
             raise SystemExit(message)
 
-        result = await sync_gateway_templates(
-            session,
+        result = await OpenClawProvisioningService(session).sync_gateway_templates(
             gateway,
-            options=GatewayTemplateSyncOptions(
+            GatewayTemplateSyncOptions(
                 user=None,
                 include_main=bool(args.include_main),
                 reset_sessions=bool(args.reset_sessions),

@@ -38,7 +38,7 @@ from app.services.openclaw.policies import OpenClawAuthorizationPolicy
 from app.services.openclaw.provisioning import (
     LeadAgentOptions,
     LeadAgentRequest,
-    ensure_board_lead_agent,
+    OpenClawProvisioningService,
 )
 from app.services.openclaw.shared import require_gateway_config_for_board
 
@@ -401,8 +401,7 @@ async def confirm_onboarding(
     session.add(onboarding)
     await session.commit()
     await session.refresh(board)
-    await ensure_board_lead_agent(
-        session,
+    await OpenClawProvisioningService(session).ensure_board_lead_agent(
         request=LeadAgentRequest(
             board=board,
             gateway=gateway,

@@ -15,6 +15,7 @@ OpenClaw Mission Control is under active development. Expect breaking changes an
 - **Backend:** FastAPI service (default http://localhost:8000)
 - **Data:** Postgres
 - **Gateway integration:** see [`docs/openclaw_gateway_ws.md`](./docs/openclaw_gateway_ws.md)
+- **Gateway base config (local):** see [`docs/openclaw_gateway_base_config.md`](./docs/openclaw_gateway_base_config.md)
 
 > Note on auth (Clerk)
 >

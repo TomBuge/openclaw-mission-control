@@ -4,6 +4,9 @@
 
 Mission Control is the **web UI and HTTP API** for operating OpenClaw. It’s designed for teams that want a clear control plane for managing **boards**, **tasks**, **agents**, **approvals**, and (optionally) **gateway connections**.
 
+<img width="1889" height="880" alt="image" src="https://github.com/user-attachments/assets/6adb4235-c951-4fa8-8733-038c1d644519" />
+
+
 ## Active development
 
 OpenClaw Mission Control is under active development. Expect breaking changes and incomplete features as we iterate.

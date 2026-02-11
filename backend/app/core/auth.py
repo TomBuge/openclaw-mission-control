@@ -16,6 +16,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 
+from app.core.auth_mode import AuthMode
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db import crud
@@ -244,7 +245,7 @@ async def _fetch_clerk_profile(clerk_user_id: str) -> tuple[str | None, str | No
 
 async def delete_clerk_user(clerk_user_id: str) -> None:
     """Delete a Clerk user via the official Clerk SDK."""
-    if settings.auth_mode != "clerk":
+    if settings.auth_mode != AuthMode.CLERK:
         return
 
     secret = settings.clerk_secret_key.strip()
@@ -422,7 +423,7 @@ async def get_auth_context(
     session: AsyncSession = SESSION_DEP,
 ) -> AuthContext:
     """Resolve required authenticated user context for the configured auth mode."""
-    if settings.auth_mode == "local":
+    if settings.auth_mode == AuthMode.LOCAL:
         local_auth = await _resolve_local_auth_context(
             request=request,
             session=session,
@@ -466,7 +467,7 @@ async def get_auth_context_optional(
     """Resolve user context if available, otherwise return `None`."""
     if request.headers.get("X-Agent-Token"):
         return None
-    if settings.auth_mode == "local":
+    if settings.auth_mode == AuthMode.LOCAL:
         return await _resolve_local_auth_context(
             request=request,
             session=session,

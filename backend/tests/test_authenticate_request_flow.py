@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.core import auth
+from app.core.auth_mode import AuthMode
 from app.models.users import User
 
 
@@ -21,7 +22,7 @@ class _FakeSession:
 async def test_get_auth_context_raises_401_when_clerk_signed_out(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(auth.settings, "auth_mode", "clerk")
+    monkeypatch.setattr(auth.settings, "auth_mode", AuthMode.CLERK)
     monkeypatch.setattr(auth.settings, "clerk_secret_key", "sk_test_dummy")
 
     from clerk_backend_api.security.types import AuthStatus, RequestState
@@ -45,7 +46,7 @@ async def test_get_auth_context_raises_401_when_clerk_signed_out(
 async def test_get_auth_context_uses_request_state_payload_claims(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(auth.settings, "auth_mode", "clerk")
+    monkeypatch.setattr(auth.settings, "auth_mode", AuthMode.CLERK)
     monkeypatch.setattr(auth.settings, "clerk_secret_key", "sk_test_dummy")
 
     from clerk_backend_api.security.types import AuthStatus, RequestState
@@ -88,7 +89,7 @@ async def test_get_auth_context_uses_request_state_payload_claims(
 async def test_get_auth_context_optional_returns_none_for_agent_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(auth.settings, "auth_mode", "clerk")
+    monkeypatch.setattr(auth.settings, "auth_mode", AuthMode.CLERK)
     monkeypatch.setattr(auth.settings, "clerk_secret_key", "sk_test_dummy")
 
     async def _boom(_request: Any) -> Any:  # pragma: no cover
@@ -108,7 +109,7 @@ async def test_get_auth_context_optional_returns_none_for_agent_token(
 async def test_get_auth_context_local_mode_requires_valid_bearer_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(auth.settings, "auth_mode", "local")
+    monkeypatch.setattr(auth.settings, "auth_mode", AuthMode.LOCAL)
     monkeypatch.setattr(auth.settings, "local_auth_token", "expected-token")
 
     async def _fake_local_user(_session: Any) -> User:
@@ -131,7 +132,7 @@ async def test_get_auth_context_local_mode_requires_valid_bearer_token(
 async def test_get_auth_context_optional_local_mode_returns_none_without_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(auth.settings, "auth_mode", "local")
+    monkeypatch.setattr(auth.settings, "auth_mode", AuthMode.LOCAL)
     monkeypatch.setattr(auth.settings, "local_auth_token", "expected-token")
 
     async def _boom(_session: Any) -> User:  # pragma: no cover

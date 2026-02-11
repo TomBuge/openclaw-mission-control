@@ -14,6 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.users import router as users_router
 from app.core import auth as auth_module
+from app.core.auth_mode import AuthMode
 from app.core.config import settings
 from app.db.session import get_session
 
@@ -51,7 +52,7 @@ async def test_local_auth_users_me_requires_and_accepts_valid_token(
     expected_email = f"local-{unique_suffix}@localhost"
     expected_name = "Local Integration User"
 
-    monkeypatch.setattr(settings, "auth_mode", "local")
+    monkeypatch.setattr(settings, "auth_mode", AuthMode.LOCAL)
     monkeypatch.setattr(settings, "local_auth_token", "integration-token")
     monkeypatch.setattr(auth_module, "LOCAL_AUTH_USER_ID", expected_user_id)
     monkeypatch.setattr(auth_module, "LOCAL_AUTH_EMAIL", expected_email)

@@ -10,6 +10,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # Tests should fail fast if auth-mode wiring breaks, but still need deterministic
-# defaults during import-time settings initialization.
-os.environ.setdefault("AUTH_MODE", "local")
-os.environ.setdefault("LOCAL_AUTH_TOKEN", "test-local-token")
+# defaults during import-time settings initialization, regardless of shell env.
+os.environ["AUTH_MODE"] = "local"
+os.environ["LOCAL_AUTH_TOKEN"] = "test-local-token-0123456789-0123456789-0123456789x"

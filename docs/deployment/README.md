@@ -32,6 +32,9 @@ From repo root:
 ```bash
 cp .env.example .env
 
+# REQUIRED for local mode:
+# set LOCAL_AUTH_TOKEN in .env to a non-placeholder value with at least 50 characters.
+
 docker compose -f compose.yml --env-file .env up -d --build
 ```
 
@@ -125,7 +128,7 @@ Set in `.env` (repo root):
 
 ```env
 AUTH_MODE=local
-LOCAL_AUTH_TOKEN=replace-with-strong-random-token
+LOCAL_AUTH_TOKEN=replace-with-random-token-at-least-50-characters
 ```
 
 Set frontend mode (optional override in `frontend/.env`):

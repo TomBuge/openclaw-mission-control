@@ -1,10 +1,12 @@
 "use client";
 
+import { AuthMode } from "@/auth/mode";
+
 let localToken: string | null = null;
 const STORAGE_KEY = "mc_local_auth_token";
 
 export function isLocalAuthMode(): boolean {
-  return process.env.NEXT_PUBLIC_AUTH_MODE === "local";
+  return process.env.NEXT_PUBLIC_AUTH_MODE === AuthMode.Local;
 }
 
 export function setLocalAuthToken(token: string): void {

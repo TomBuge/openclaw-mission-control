@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.auth_mode import AuthMode
+
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_FILE = BACKEND_ROOT / ".env"
+LOCAL_AUTH_TOKEN_MIN_LENGTH = 50
+LOCAL_AUTH_TOKEN_PLACEHOLDERS = frozenset(
+    {
+        "change-me",
+        "changeme",
+        "replace-me",
+        "replace-with-strong-random-token",
+    },
+)
 
 
 class Settings(BaseSettings):
@@ -27,7 +38,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/openclaw_agency"
 
     # Auth mode: "clerk" for Clerk JWT auth, "local" for shared bearer token auth.
-    auth_mode: Literal["clerk", "local"]
+    auth_mode: AuthMode
     local_auth_token: str = ""
 
     # Clerk auth (auth only; roles stored in DB)
@@ -51,15 +62,20 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _defaults(self) -> Self:
-        if self.auth_mode == "clerk":
+        if self.auth_mode == AuthMode.CLERK:
             if not self.clerk_secret_key.strip():
                 raise ValueError(
                     "CLERK_SECRET_KEY must be set and non-empty when AUTH_MODE=clerk.",
                 )
-        elif self.auth_mode == "local":
-            if not self.local_auth_token.strip():
+        elif self.auth_mode == AuthMode.LOCAL:
+            token = self.local_auth_token.strip()
+            if (
+                not token
+                or len(token) < LOCAL_AUTH_TOKEN_MIN_LENGTH
+                or token.lower() in LOCAL_AUTH_TOKEN_PLACEHOLDERS
+            ):
                 raise ValueError(
-                    "LOCAL_AUTH_TOKEN must be set and non-empty when AUTH_MODE=local.",
+                    "LOCAL_AUTH_TOKEN must be at least 50 characters and non-placeholder when AUTH_MODE=local.",
                 )
         # In dev, default to applying Alembic migrations at startup to avoid
         # schema drift (e.g. missing newly-added columns).

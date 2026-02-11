@@ -60,7 +60,7 @@ Recommended approach:
 Secrets guidelines:
 
 - Choose auth mode explicitly:
-  - `AUTH_MODE=local`: set a strong `LOCAL_AUTH_TOKEN`
+  - `AUTH_MODE=local`: set `LOCAL_AUTH_TOKEN` to a random value with at least 50 characters
   - `AUTH_MODE=clerk`: configure Clerk keys
 - Never commit `LOCAL_AUTH_TOKEN` or Clerk secret key.
 - Prefer passing secrets as environment variables from the host (or use Docker secrets if you later

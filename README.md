@@ -54,12 +54,15 @@ Mission Control supports two auth modes via `AUTH_MODE`:
 ```bash
 cp .env.example .env
 
+# REQUIRED for local auth mode:
+# set LOCAL_AUTH_TOKEN to a non-placeholder value with at least 50 characters.
+
 # REQUIRED: the browser must be able to reach the backend.
 # NEXT_PUBLIC_API_URL must be reachable from the *browser* (host), not an internal Docker network name.
 # Missing/blank NEXT_PUBLIC_API_URL will break frontend API calls (e.g. Activity feed).
 
 # Auth defaults in .env.example are local mode.
-# For production, set LOCAL_AUTH_TOKEN to a strong random value.
+# For production, set LOCAL_AUTH_TOKEN to a random value with at least 50 characters.
 # For Clerk mode, set AUTH_MODE=clerk and provide Clerk keys.
 
 docker compose -f compose.yml --env-file .env up -d --build

@@ -51,6 +51,27 @@ It is derived from `backend/app/main.py` (router registration) and `backend/app/
 ## `/agent` — `agent.py`
 *Agent-scoped API routes for board operations and gateway coordination.*
 
+### Agent automation API (`/api/v1/agent/*`)
+
+Auth:
+- Header: `X-Agent-Token: <token>`
+- See: `backend/app/core/agent_auth.py` and `backend/app/api/deps.py`
+
+High-signal endpoint index (from `backend/app/api/agent.py`):
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/agent/heartbeat` | Agent check-in / heartbeat status |
+| `GET` | `/api/v1/agent/boards` | List boards visible to the agent |
+| `GET` | `/api/v1/agent/boards/{board_id}/tasks` | List tasks with filters (status, assignment, etc.) |
+| `PATCH` | `/api/v1/agent/boards/{board_id}/tasks/{task_id}` | Update task fields (status/assignment/etc.) |
+| `GET` | `/api/v1/agent/boards/{board_id}/tasks/{task_id}/comments` | List task comments |
+| `POST` | `/api/v1/agent/boards/{board_id}/tasks/{task_id}/comments` | Create task comment (note: request body uses `message`) |
+| `GET` | `/api/v1/agent/boards/{board_id}/memory` | List board memory entries |
+| `POST` | `/api/v1/agent/boards/{board_id}/memory` | Create board memory entry |
+| `POST` | `/api/v1/agent/boards/{board_id}/gateway/main/ask-user` | Route an “ask user” message through gateway-main |
+| `POST` | `/api/v1/agent/gateway/leads/broadcast` | Broadcast a gateway-main message to multiple board leads |
+
 ### router (prefix `/agent`)
 
 | Method | Path | Handler | Notes |

@@ -104,6 +104,28 @@ frontend-test: frontend-tooling ## Frontend tests (vitest)
 backend-migrate: ## Apply backend DB migrations (uses backend/migrations)
 	cd $(BACKEND_DIR) && uv run alembic upgrade head
 
+.PHONY: backend-migration-check
+backend-migration-check: ## Validate Alembic migrations on clean Postgres (upgrade head + single-head sanity)
+	@set -euo pipefail; \
+	CONTAINER_NAME="mc-migration-check-$$RANDOM"; \
+	docker run -d --rm --name $$CONTAINER_NAME -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=migration_ci -p 55432:5432 postgres:16 >/dev/null; \
+	cleanup() { docker rm -f $$CONTAINER_NAME >/dev/null 2>&1 || true; }; \
+	trap cleanup EXIT; \
+	for i in $$(seq 1 30); do \
+		if docker exec $$CONTAINER_NAME pg_isready -U postgres -d migration_ci >/dev/null 2>&1; then break; fi; \
+		sleep 1; \
+		if [ $$i -eq 30 ]; then echo "Postgres did not become ready"; exit 1; fi; \
+	done; \
+	cd $(BACKEND_DIR) && \
+		AUTH_MODE=local \
+		LOCAL_AUTH_TOKEN=ci-local-token-ci-local-token-ci-local-token-ci-local-token \
+		DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:55432/migration_ci \
+		uv run alembic upgrade head && \
+		AUTH_MODE=local \
+		LOCAL_AUTH_TOKEN=ci-local-token-ci-local-token-ci-local-token-ci-local-token \
+		DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:55432/migration_ci \
+		uv run alembic heads | grep -q "(head)"
+
 .PHONY: build
 build: frontend-build ## Build artifacts
 

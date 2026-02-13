@@ -127,10 +127,12 @@ def _comment_validation_error() -> HTTPException:
 
 
 def _blocked_task_error(blocked_by_task_ids: Sequence[UUID]) -> HTTPException:
+    # NOTE: Keep this payload machine-readable; UI and automation rely on it.
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail={
             "message": "Task is blocked by incomplete dependencies.",
+            "code": "task_blocked_cannot_transition",
             "blocked_by_task_ids": [str(value) for value in blocked_by_task_ids],
         },
     )
@@ -1960,13 +1962,19 @@ async def _apply_lead_task_update(
         update=update,
     )
 
-    if blocked_by and update.task.status != "done":
-        update.task.status = "inbox"
-        update.task.assigned_agent_id = None
-        update.task.in_progress_at = None
-    else:
-        await _lead_apply_assignment(session, update=update)
-        _lead_apply_status(update)
+    # Blocked tasks should not be silently rewritten into a "blocked-safe" state.
+    # Instead, reject assignment/status transitions with an explicit 409 payload.
+    if blocked_by:
+        attempted_fields: set[str] = set(update.updates.keys())
+        attempted_transition = (
+            "assigned_agent_id" in attempted_fields
+            or "status" in attempted_fields
+        )
+        if attempted_transition:
+            raise _blocked_task_error(blocked_by)
+
+    await _lead_apply_assignment(session, update=update)
+    _lead_apply_status(update)
     await _require_no_pending_approval_for_status_change_when_enabled(
         session,
         board_id=update.board_id,

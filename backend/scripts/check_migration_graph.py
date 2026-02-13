@@ -49,21 +49,30 @@ def main() -> int:
         return 1
 
     try:
-        reachable = {rev.revision for rev in script.walk_revisions(base="base", head="heads") if rev.revision}
+        reachable: set[str] = set()
+        for walk_rev in script.walk_revisions(base="base", head="heads"):
+            if walk_rev is None:
+                continue
+            if walk_rev.revision:
+                reachable.add(walk_rev.revision)
     except Exception as exc:  # pragma: no cover - CI path
         print(f"ERROR: failed while walking Alembic revision graph: {exc}")
         return 1
 
-    all_revisions = {
-        rev.revision
-        for rev in script.revision_map._revision_map.values()  # type: ignore[attr-defined]
-        if getattr(rev, "revision", None)
-    }
+    all_revisions: set[str] = set()
+    # Alembic's revision_map is dynamically typed; guard None values.
+    for map_rev in script.revision_map._revision_map.values():
+        if map_rev is None:
+            continue
+        revision = getattr(map_rev, "revision", None)
+        if revision:
+            all_revisions.add(revision)
+
     orphans = sorted(all_revisions - reachable)
     if orphans:
         print("ERROR: orphan Alembic revisions detected (not reachable from heads):")
-        for rev in orphans:
-            print(f"  - {rev}")
+        for orphan_rev in orphans:
+            print(f"  - {orphan_rev}")
         return 1
 
     print("OK: migration graph integrity passed")

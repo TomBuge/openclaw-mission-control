@@ -196,7 +196,18 @@ export default function SkillsMarketplacePage() {
       }
 
       try {
-        const gatewaySkills = await loadSkillsByGateway();
+        const gatewaySkills = await Promise.all(
+          gateways.map(async (gateway) => {
+            const response = await listMarketplaceSkillsApiV1SkillsMarketplaceGet({
+              gateway_id: gateway.id,
+            });
+            return {
+              gatewayId: gateway.id,
+              gatewayName: gateway.name,
+              skills: response.status === 200 ? response.data : [],
+            };
+          }),
+        );
 
         if (cancelled) return;
 
@@ -225,7 +236,7 @@ export default function SkillsMarketplacePage() {
     return () => {
       cancelled = true;
     };
-  }, [gateways, isAdmin, isSignedIn, loadSkillsByGateway, skills]);
+  }, [gateways, isAdmin, isSignedIn, skills]);
 
   const installMutation =
     useInstallMarketplaceSkillApiV1SkillsMarketplaceSkillIdInstallPost<ApiError>(

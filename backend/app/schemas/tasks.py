@@ -98,6 +98,7 @@ class TaskCommentRead(SQLModel):
 
     id: UUID
     message: str | None
+    actor_name: str | None = None
     agent_id: UUID | None
     task_id: UUID | None
     created_at: datetime

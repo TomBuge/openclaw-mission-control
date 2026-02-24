@@ -237,7 +237,7 @@ const toLiveFeedFromComment = (comment: TaskCommentRead): LiveFeedItem => ({
   created_at: comment.created_at,
   message: comment.message ?? null,
   agent_id: comment.agent_id ?? null,
-  actor_name: null,
+  actor_name: comment.actor_name ?? null,
   task_id: comment.task_id ?? null,
   title: null,
   event_type: "task.comment",

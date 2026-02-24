@@ -1611,7 +1611,7 @@ class AgentLifecycleService(OpenClawDBService):
         gateway, client_config = await self.require_gateway(board)
         
         # Check if agent is already linked
-        session_id = f"agent:{payload.gateway_agent_id}"
+        session_id = f"agent:{payload.gateway_agent_id}:main"
         existing_agent = await Agent.objects.filter_by(
             gateway_id=gateway.id,
             openclaw_session_id=session_id,

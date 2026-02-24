@@ -1568,6 +1568,8 @@ def _comment_actor_id(actor: ActorContext) -> UUID | None:
 def _comment_actor_name(actor: ActorContext) -> str:
     if actor.actor_type == "agent" and actor.agent:
         return actor.agent.name
+    if actor.actor_type == "user" and actor.user:
+        return actor.user.preferred_name or actor.user.name or "User"
     return "User"
 
 
@@ -1610,7 +1612,11 @@ async def _notify_task_comment_targets(
     *,
     request: _TaskCommentNotifyRequest,
 ) -> None:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("comment_notify: targets=%s mention_names=%s", list(request.targets.keys()), request.mention_names)
     if not request.targets:
+        logger.info("comment_notify: no targets, skipping")
         return
     board = (
         await Board.objects.by_id(request.task.board_id).first(session)
@@ -1647,7 +1653,8 @@ async def _notify_task_comment_targets(
             "If you are mentioned but not assigned, reply in the task "
             "thread but do not change task status."
         )
-        await _send_agent_task_message(
+        logger.info("comment_notify: sending to agent=%s session=%s", agent.name, agent.openclaw_session_id)
+        error = await _send_agent_task_message(
             dispatch=dispatch,
             session_key=agent.openclaw_session_id,
             config=config,
@@ -2415,6 +2422,7 @@ async def create_task_comment(
         message=payload.message,
         task_id=task.id,
         agent_id=_comment_actor_id(actor),
+        actor_name=_comment_actor_name(actor),
     )
     session.add(event)
     await session.commit()

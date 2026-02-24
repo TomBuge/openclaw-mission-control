@@ -236,7 +236,7 @@ async def discover_agents(
             continue
             
         workspace = agent_data.get("workspace")
-        session_id = f"agent:{agent_id}"
+        session_id = f"agent:{agent_id}:main"
         
         # Check if already linked
         linked = session_id in linked_agent_ids

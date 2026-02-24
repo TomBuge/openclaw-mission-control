@@ -3880,8 +3880,8 @@ export default function BoardDetailPage() {
                       comment={comment}
                       authorLabel={
                         comment.agent_id
-                          ? (assigneeById.get(comment.agent_id) ?? "Agent")
-                          : currentUserDisplayName
+                          ? (assigneeById.get(comment.agent_id) ?? comment.actor_name ?? "Agent")
+                          : (comment.actor_name ?? currentUserDisplayName)
                       }
                     />
                   ))}

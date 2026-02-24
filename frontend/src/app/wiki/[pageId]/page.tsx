@@ -29,7 +29,7 @@ export default function WikiPageView() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const token = typeof window !== "undefined" ? sessionStorage.getItem("mc_auth_token") : null;
+  const token = typeof window !== "undefined" ? sessionStorage.getItem("mc_local_auth_token") : null;
 
   const fetchPage = useCallback(async () => {
     if (!token || !pageId) return;

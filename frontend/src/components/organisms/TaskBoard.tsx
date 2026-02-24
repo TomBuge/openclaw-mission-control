@@ -13,7 +13,7 @@ import { TaskCard } from "@/components/molecules/TaskCard";
 import { parseApiDatetime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-type TaskStatus = "inbox" | "in_progress" | "review" | "done";
+type TaskStatus = string;
 
 type Task = {
   id: string;
@@ -31,11 +31,21 @@ type Task = {
   is_blocked?: boolean;
 };
 
+type ColumnDef = {
+  title: string;
+  status: string;
+  dot: string;
+  accent: string;
+  text: string;
+  badge: string;
+};
+
 type TaskBoardProps = {
   tasks: Task[];
   onTaskSelect?: (task: Task) => void;
   onTaskMove?: (taskId: string, status: TaskStatus) => void | Promise<void>;
   readOnly?: boolean;
+  customColumns?: ColumnDef[];
 };
 
 type ReviewBucket = "all" | "approval_needed" | "waiting_lead" | "blocked";
@@ -128,7 +138,9 @@ export const TaskBoard = memo(function TaskBoard({
   onTaskSelect,
   onTaskMove,
   readOnly = false,
+  customColumns,
 }: TaskBoardProps) {
+  const activeColumns = customColumns ?? columns;
   const boardRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevPositionsRef = useRef<Map<string, CardPosition>>(new Map());
@@ -286,21 +298,16 @@ export const TaskBoard = memo(function TaskBoard({
   }, [draggingId, measurePositions, tasks]);
 
   const grouped = useMemo(() => {
-    const buckets: Record<TaskStatus, Task[]> = {
-      inbox: [],
-      in_progress: [],
-      review: [],
-      done: [],
-    };
-    for (const column of columns) {
+    const buckets: Record<string, Task[]> = {};
+    for (const column of activeColumns) {
       buckets[column.status] = [];
     }
     tasks.forEach((task) => {
-      const bucket = buckets[task.status] ?? buckets.inbox;
-      bucket.push(task);
+      const bucket = buckets[task.status] ?? buckets[activeColumns[0]?.status ?? "inbox"];
+      if (bucket) bucket.push(task);
     });
     return buckets;
-  }, [tasks]);
+  }, [tasks, activeColumns]);
 
   // Keep drag/drop state and payload handling centralized for column move interactions.
   const handleDragStart =
@@ -370,7 +377,7 @@ export const TaskBoard = memo(function TaskBoard({
         "sm:grid-flow-col sm:auto-cols-[minmax(260px,320px)] sm:grid-cols-none sm:overflow-x-auto",
       )}
     >
-      {columns.map((column) => {
+      {activeColumns.map((column) => {
         const columnTasks = grouped[column.status] ?? [];
         // Derive review tab counts and the active subset from one canonical task list.
         const reviewCounts =

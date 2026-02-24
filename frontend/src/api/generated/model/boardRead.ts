@@ -25,6 +25,7 @@ export interface BoardRead {
   require_review_before_done?: boolean;
   block_status_changes_with_pending_approval?: boolean;
   only_lead_can_change_status?: boolean;
+  custom_statuses?: Array<{ value: string; label: string; color?: string }> | null;
   /** @minimum 0 */
   max_agents?: number;
   id: string;

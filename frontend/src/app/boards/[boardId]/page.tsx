@@ -512,12 +512,35 @@ const priorities = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
 ];
-const statusOptions = [
+const defaultStatusOptions = [
   { value: "inbox", label: "Inbox" },
   { value: "in_progress", label: "In progress" },
   { value: "review", label: "Review" },
   { value: "done", label: "Done" },
 ];
+
+const STATUS_COLORS: Record<string, { dot: string; accent: string; text: string; badge: string }> = {
+  slate: { dot: "bg-slate-400", accent: "hover:border-slate-400 hover:bg-slate-50", text: "group-hover:text-slate-700 text-slate-500", badge: "bg-slate-100 text-slate-600" },
+  purple: { dot: "bg-purple-500", accent: "hover:border-purple-400 hover:bg-purple-50", text: "group-hover:text-purple-600 text-slate-500", badge: "bg-purple-100 text-purple-700" },
+  indigo: { dot: "bg-indigo-500", accent: "hover:border-indigo-400 hover:bg-indigo-50", text: "group-hover:text-indigo-600 text-slate-500", badge: "bg-indigo-100 text-indigo-700" },
+  green: { dot: "bg-green-500", accent: "hover:border-green-400 hover:bg-green-50", text: "group-hover:text-green-600 text-slate-500", badge: "bg-emerald-100 text-emerald-700" },
+  blue: { dot: "bg-blue-500", accent: "hover:border-blue-400 hover:bg-blue-50", text: "group-hover:text-blue-600 text-slate-500", badge: "bg-blue-100 text-blue-700" },
+  amber: { dot: "bg-amber-500", accent: "hover:border-amber-400 hover:bg-amber-50", text: "group-hover:text-amber-600 text-slate-500", badge: "bg-amber-100 text-amber-700" },
+  red: { dot: "bg-red-500", accent: "hover:border-red-400 hover:bg-red-50", text: "group-hover:text-red-600 text-slate-500", badge: "bg-red-100 text-red-700" },
+  cyan: { dot: "bg-cyan-500", accent: "hover:border-cyan-400 hover:bg-cyan-50", text: "group-hover:text-cyan-600 text-slate-500", badge: "bg-cyan-100 text-cyan-700" },
+  orange: { dot: "bg-orange-500", accent: "hover:border-orange-400 hover:bg-orange-50", text: "group-hover:text-orange-600 text-slate-500", badge: "bg-orange-100 text-orange-700" },
+  rose: { dot: "bg-rose-500", accent: "hover:border-rose-400 hover:bg-rose-50", text: "group-hover:text-rose-600 text-slate-500", badge: "bg-rose-100 text-rose-700" },
+};
+
+const COLOR_CYCLE = ["slate", "purple", "blue", "indigo", "amber", "cyan", "green", "orange", "rose", "red"];
+
+function buildCustomColumns(customStatuses: Array<{ value: string; label: string; color?: string }>) {
+  return customStatuses.map((s, i) => {
+    const colorKey = s.color ?? COLOR_CYCLE[i % COLOR_CYCLE.length];
+    const colors = STATUS_COLORS[colorKey] ?? STATUS_COLORS.slate;
+    return { title: s.label, status: s.value, ...colors };
+  });
+}
 
 const EMOJI_GLYPHS: Record<string, string> = {
   ":gear:": "⚙️",
@@ -878,6 +901,20 @@ export default function BoardDetailPage() {
   const [isDeletingTask, setIsDeletingTask] = useState(false);
   const [deleteTaskError, setDeleteTaskError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
+
+  const boardColumns = useMemo(() => {
+    if (board?.custom_statuses && board.custom_statuses.length > 0) {
+      return buildCustomColumns(board.custom_statuses);
+    }
+    return undefined;
+  }, [board?.custom_statuses]);
+
+  const statusOptions = useMemo(() => {
+    if (board?.custom_statuses && board.custom_statuses.length > 0) {
+      return board.custom_statuses.map((s) => ({ value: s.value, label: s.label }));
+    }
+    return defaultStatusOptions;
+  }, [board?.custom_statuses]);
   const [isLiveFeedOpen, setIsLiveFeedOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const isLiveFeedOpenRef = useRef(false);
@@ -2697,7 +2734,7 @@ export default function BoardDetailPage() {
   };
 
   const handleTaskMove = useCallback(
-    async (taskId: string, status: TaskStatus) => {
+    async (taskId: string, status: string) => {
       if (!isSignedIn || !boardId) return;
       const currentTask = tasksRef.current.find((task) => task.id === taskId);
       if (!currentTask || currentTask.status === status) return;
@@ -3444,6 +3481,7 @@ export default function BoardDetailPage() {
                       onTaskSelect={openComments}
                       onTaskMove={canWrite ? handleTaskMove : undefined}
                       readOnly={!canWrite}
+                      customColumns={boardColumns}
                     />
                   ) : (
                     <div className="rounded-xl border border-slate-200 bg-white shadow-sm">

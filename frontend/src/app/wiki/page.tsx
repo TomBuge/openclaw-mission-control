@@ -16,10 +16,12 @@ interface WikiPage {
 }
 
 const CATEGORIES = [
-  { value: "regulatory", label: "Regulatory & Compliance", icon: Shield, color: "bg-blue-500", lightBg: "bg-blue-50", lightText: "text-blue-700", border: "border-blue-200" },
+  { value: "iso27566", label: "ISO 27566", icon: Shield, color: "bg-blue-500", lightBg: "bg-blue-50", lightText: "text-blue-700", border: "border-blue-200" },
+  { value: "iso27001", label: "ISO 27001", icon: Shield, color: "bg-indigo-500", lightBg: "bg-indigo-50", lightText: "text-indigo-700", border: "border-indigo-200" },
   { value: "research", label: "Research", icon: FlaskConical, color: "bg-purple-500", lightBg: "bg-purple-50", lightText: "text-purple-700", border: "border-purple-200" },
   { value: "product", label: "Product", icon: Rocket, color: "bg-emerald-500", lightBg: "bg-emerald-50", lightText: "text-emerald-700", border: "border-emerald-200" },
   { value: "sales", label: "Sales", icon: DollarSign, color: "bg-amber-500", lightBg: "bg-amber-50", lightText: "text-amber-700", border: "border-amber-200" },
+  { value: "regulatory", label: "Regulatory", icon: Shield, color: "bg-cyan-500", lightBg: "bg-cyan-50", lightText: "text-cyan-700", border: "border-cyan-200" },
   { value: "general", label: "General", icon: File, color: "bg-slate-500", lightBg: "bg-slate-50", lightText: "text-slate-700", border: "border-slate-200" },
 ];
 

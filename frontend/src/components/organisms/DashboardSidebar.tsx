@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Network,
   Settings,
+  Search,
   Target,
   TrendingUp,
 } from "lucide-react";
@@ -56,6 +57,7 @@ export function DashboardSidebar() {
 
   const MAIN_BOARD_ID = "77ac2212-d23f-4405-b395-5459994d1ffa";
   const SALES_BOARD_ID = "50c2b7fc-92c1-4b02-a9e3-5f782d642ab5";
+  const COMPETITOR_BOARD_ID = "42745e83-4afe-406e-91da-b8960e76f71f";
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
@@ -106,6 +108,18 @@ export function DashboardSidebar() {
               >
                 <TrendingUp className="h-4 w-4" />
                 Sales Pipeline
+              </Link>
+              <Link
+                href={`/boards/${COMPETITOR_BOARD_ID}`}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname === `/boards/${COMPETITOR_BOARD_ID}`
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <Search className="h-4 w-4" />
+                Competitor Intel
               </Link>
             </div>
           </div>
